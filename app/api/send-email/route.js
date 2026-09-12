@@ -16,6 +16,10 @@ export async function POST(req) {
     } = body;
 
     const recipientEmail = process.env.SUPERHERO_EMAIL || process.env.EMAIL_USER || process.env.SMTP_USER || 'adhithyanvv4courses@gmail.com';
+    const mailUser = process.env.EMAIL_USER || process.env.SMTP_USER;
+    const rawMailPass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
+    const mailPass = rawMailPass ? rawMailPass.replace(/\s+/g, '') : '';
+    const smtpHost = process.env.SMTP_HOST;
 
     // Format chat transcript as HTML chat bubbles if provided
     let transcriptHtml = '';
