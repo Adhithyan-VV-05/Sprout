@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, ChevronRight, BookOpen, User, Sparkles, ArrowDown } from 'lucide-react';
 import { STORY_SCENES } from '../data/storyData';
 import ParticleCanvas from './ParticleCanvas';
-import { getAdaptiveImageSource, getBlurPlaceholder } from '../services/imageOptimizer';
+import { getAdaptiveImageSource, getBlurPlaceholder, isMobileViewport } from '../services/imageOptimizer';
 
 export default function StoryMode({ isActive, onClose, userProfile, updateUserProfile }) {
   const [beatIndex, setBeatIndex] = useState(0);
@@ -12,13 +12,42 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
   const [validationMsg, setValidationMsg] = useState('');
   const [showPortalTransition, setShowPortalTransition] = useState(true);
   const [isChapterDrawerOpen, setIsChapterDrawerOpen] = useState(false);
+  const [showEndingFade, setShowEndingFade] = useState(false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth <= 768);
 
-  // Background Image State
+  // Background Image & Preloading State
   const [bgImageSrc, setBgImageSrc] = useState('');
   const [bgBlurSrc, setBgBlurSrc] = useState('');
   const [isBgLoaded, setIsBgLoaded] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(false);
 
   const containerRef = useRef(null);
+
+  // Typewriter Helper Component (No cursor at end, simple smooth typing feel)
+  const TypewriterText = ({ text, speed = 25 }) => {
+    const [displayedText, setDisplayedText] = useState('');
+
+    useEffect(() => {
+      if (!text) {
+        setDisplayedText('');
+        return;
+      }
+
+      setDisplayedText('');
+      let currentIndex = 0;
+      const timer = setInterval(() => {
+        currentIndex++;
+        setDisplayedText(text.slice(0, currentIndex));
+        if (currentIndex >= text.length) {
+          clearInterval(timer);
+        }
+      }, speed);
+
+      return () => clearInterval(timer);
+    }, [text, speed]);
+
+    return <>{displayedText}</>;
+  };
 
   // Flatten all 18 scenes into individual discrete beats with safeZone metadata
   const flatBeats = useMemo(() => {
@@ -150,12 +179,23 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
     return beats;
   }, []);
 
+  // Track viewport size changes for mobile/desktop image swapping
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Reset active state when story mode opens
   useEffect(() => {
     if (isActive) {
       setShowPortalTransition(true);
       setBeatIndex(0);
       setValidationMsg('');
       setIsChapterDrawerOpen(false);
+      setShowEndingFade(false);
       const timer = setTimeout(() => {
         setShowPortalTransition(false);
       }, 1100);
@@ -165,7 +205,8 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
 
   const currentBeat = flatBeats[beatIndex] || flatBeats[0];
 
-  // Network Adaptive & Pre-warming Image Loading Effect
+  // Network Adaptive & Pre-warming Image Loading Effect with Loading Indicator
+  // Re-runs when mobile state changes to swap between PC and mobile images
   useEffect(() => {
     if (!currentBeat || !currentBeat.image) return;
 
@@ -173,12 +214,24 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
     const blurSrc = getBlurPlaceholder(currentBeat.image);
 
     setBgBlurSrc(blurSrc);
-    setBgImageSrc(adaptiveSrc);
-    setIsBgLoaded(false);
 
-    const img = new Image();
-    img.src = adaptiveSrc;
-    img.onload = () => setIsBgLoaded(true);
+    // Force reload when switching between mobile and desktop
+    if (bgImageSrc !== adaptiveSrc) {
+      setIsImageLoading(true);
+      setIsBgLoaded(false);
+
+      const img = new Image();
+      img.src = adaptiveSrc;
+      img.onload = () => {
+        setBgImageSrc(adaptiveSrc);
+        setIsBgLoaded(true);
+        setIsImageLoading(false);
+      };
+      img.onerror = () => {
+        setBgImageSrc(adaptiveSrc);
+        setIsImageLoading(false);
+      };
+    }
 
     const nextBeat = flatBeats[beatIndex + 1];
     if (nextBeat && nextBeat.image) {
@@ -186,7 +239,7 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
       const prewarmImg = new Image();
       prewarmImg.src = nextAdaptiveSrc;
     }
-  }, [currentBeat, beatIndex, flatBeats]);
+  }, [currentBeat, beatIndex, flatBeats, bgImageSrc, isMobile]);
 
   // Check if mandatory input is pending
   const isInputPending = currentBeat && currentBeat.type === 'interaction' && (
@@ -196,7 +249,7 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
     (currentBeat.interaction.storeKey === 'visitorEmail' && !userProfile.visitorEmail)
   );
 
-  // Click Viewport to Advance Beat
+  // Click Viewport to Advance Beat or Trigger Ending Screen
   const handleViewportClick = (e) => {
     if (
       e.target.closest('input') ||
@@ -210,8 +263,13 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
 
     if (isInputPending) return;
 
-    if (beatIndex >= flatBeats.length - 1) {
+    if (showEndingFade) {
       onClose();
+      return;
+    }
+
+    if (beatIndex >= flatBeats.length - 1) {
+      setShowEndingFade(true);
     } else {
       setBeatIndex((prev) => prev + 1);
     }
@@ -227,9 +285,17 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
       e.preventDefault();
       if (isInputPending) return;
       if (e.deltaY > 20) {
-        setBeatIndex((prev) => Math.min(flatBeats.length - 1, prev + 1));
+        if (beatIndex >= flatBeats.length - 1) {
+          setShowEndingFade(true);
+        } else {
+          setBeatIndex((prev) => Math.min(flatBeats.length - 1, prev + 1));
+        }
       } else if (e.deltaY < -20) {
-        setBeatIndex((prev) => Math.max(0, prev - 1));
+        if (showEndingFade) {
+          setShowEndingFade(false);
+        } else {
+          setBeatIndex((prev) => Math.max(0, prev - 1));
+        }
       }
     };
 
@@ -242,10 +308,18 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
       const touchY = e.touches[0].clientY;
       const diffY = touchStartY - touchY;
       if (diffY > 40) {
-        setBeatIndex((prev) => Math.min(flatBeats.length - 1, prev + 1));
+        if (beatIndex >= flatBeats.length - 1) {
+          setShowEndingFade(true);
+        } else {
+          setBeatIndex((prev) => Math.min(flatBeats.length - 1, prev + 1));
+        }
         touchStartY = touchY;
       } else if (diffY < -40) {
-        setBeatIndex((prev) => Math.max(0, prev - 1));
+        if (showEndingFade) {
+          setShowEndingFade(false);
+        } else {
+          setBeatIndex((prev) => Math.max(0, prev - 1));
+        }
         touchStartY = touchY;
       }
     };
@@ -253,10 +327,18 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
         if (!isInputPending) {
-          setBeatIndex((prev) => Math.min(flatBeats.length - 1, prev + 1));
+          if (beatIndex >= flatBeats.length - 1) {
+            setShowEndingFade(true);
+          } else {
+            setBeatIndex((prev) => Math.min(flatBeats.length - 1, prev + 1));
+          }
         }
       } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-        setBeatIndex((prev) => Math.max(0, prev - 1));
+        if (showEndingFade) {
+          setShowEndingFade(false);
+        } else {
+          setBeatIndex((prev) => Math.max(0, prev - 1));
+        }
       } else if (e.key === 'Escape') {
         if (isChapterDrawerOpen) {
           setIsChapterDrawerOpen(false);
@@ -277,7 +359,7 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isActive, showPortalTransition, isChapterDrawerOpen, flatBeats.length, onClose]);
+  }, [isActive, showPortalTransition, isChapterDrawerOpen, flatBeats.length, beatIndex, showEndingFade, isInputPending, onClose]);
 
   if (!isActive) return null;
 
@@ -318,12 +400,10 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
   const formatText = (text) => {
     if (!text) return '';
     return text
-      .replace('{visitorName}', userProfile.visitorName || 'friend')
-      .replace('{visitorAge}', userProfile.visitorAge || 'many')
-      .replace('{visitorLocation}', userProfile.visitorLocation || 'home');
+      .replace('{visitorName}', userProfile.visitorName || '')
+      .replace('{visitorAge}', userProfile.visitorAge || '')
+      .replace('{visitorLocation}', userProfile.visitorLocation || '');
   };
-
-  const isNameAlreadySet = currentBeat.type === 'interaction' && currentBeat.interaction.storeKey === 'visitorName' && userProfile.visitorName;
 
   return (
     <div 
@@ -351,6 +431,36 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
           <div className="portal-subcaption">Step into the story of Asterra</div>
           <div className="portal-arrow">↓</div>
         </div>
+      ) : showEndingFade ? (
+        /* SLOW 2-SECOND ENDING FADE OVERLAY */
+        <div className="story-ending-fade-overlay" onClick={onClose}>
+          <div 
+            className="ending-bg-image-layer" 
+            style={{ backgroundImage: `url('/story/18 pc.webp')` }} 
+          />
+          <div className="ending-gradient-mask" />
+          <div className="ending-content-card animate-beat-in">
+            <img src="/story/1 pc-sm.webp" alt="Sprout" className="ending-sprout-avatar" />
+            <h2 className="ending-card-title">The Light Lives in You</h2>
+            <p className="ending-card-subtitle">
+              {userProfile.visitorName 
+                ? `Thank you for walking with Sprout, ${userProfile.visitorName}. Asterra will always remember your kindness.` 
+                : "Thank you for stepping into Sprout's story. Every seed carries hope."}
+            </p>
+            <p className="ending-card-subtitle" style={{ fontSize: '0.95rem', opacity: 0.88, fontStyle: 'italic', marginTop: '-0.4rem' }}>
+              Not all superheroes arrive with strength or speed. Some arrive with a soft word, a moment of stillness, and the courage to truly listen. That is Sprout’s power — and it lives in every one of us.
+            </p>
+            <button 
+              type="button" 
+              className="ref-btn-primary-explore interactive" 
+              onClick={onClose}
+              style={{ marginTop: '0.5rem' }}
+            >
+              <span>Return to Hero</span>
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
       ) : (
         <>
           {/* Instant Blur Placeholder Background */}
@@ -374,7 +484,7 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
 
           {/* TOP BAR: BRAND + CLEAN CHAPTER TITLE */}
           <div className="story-top-bar-redesigned">
-            {/* Top-Left Clean Chapter Title Pill (Only Chapter Title) */}
+            {/* Top-Left Clean Chapter Title Pill (Only Chapter Title + Circular Spinner when loading next image) */}
             <div 
               className="story-top-chapter-pill interactive"
               onClick={(e) => {
@@ -383,7 +493,11 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
               }}
               title="Open Chapter Index"
             >
-              <BookOpen size={15} className="chapter-hud-icon" />
+              {isImageLoading ? (
+                <span className="hud-small-spinner" title="New image loading..." />
+              ) : (
+                <BookOpen size={15} className="chapter-hud-icon" />
+              )}
               <span className="chapter-hud-title-text">{currentBeat.sceneTitle}</span>
             </div>
 
@@ -411,7 +525,7 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
                 <span className="speaker-pulse-badge" />
               </div>
               <p className="bubble-sentence-text">
-                "{formatText(currentBeat.text)}"
+                "<TypewriterText text={formatText(currentBeat.text)} />"
               </p>
             </div>
           )}
@@ -426,7 +540,7 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
                 <span className="speaker-name-title visitor">{userProfile.visitorName || 'You'}</span>
               </div>
               <p className="bubble-sentence-text visitor-text">
-                "{formatText(currentBeat.text)}"
+                "<TypewriterText text={formatText(currentBeat.text)} />"
               </p>
             </div>
           )}
@@ -438,7 +552,7 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
                 <span className="speaker-name-title wither">WITHER</span>
               </div>
               <p className="bubble-sentence-text wither-text">
-                "{currentBeat.text}"
+                "<TypewriterText text={currentBeat.text} />"
               </p>
             </div>
           )}
@@ -447,7 +561,7 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
           {currentBeat.type === 'narrative' && (
             <div className="single-sentence-caption-bar animate-beat-in">
               <p className="narrative-single-line">
-                "{formatText(currentBeat.text)}"
+                "<TypewriterText text={formatText(currentBeat.text)} />"
               </p>
             </div>
           )}
@@ -456,7 +570,7 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
           {currentBeat.type === 'highlight' && (
             <div className="golden-highlight-single-bar animate-beat-in">
               <p className="golden-emotional-single-line">
-                "{formatText(currentBeat.text)}"
+                "<TypewriterText text={formatText(currentBeat.text)} />"
               </p>
             </div>
           )}
@@ -468,17 +582,28 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
             </div>
           )}
 
-          {/* BEAT TYPE 7: INTERACTIVE INPUT CARD */}
+          {/* BEAT TYPE 7: INTERACTIVE INPUT CARD OR VISITOR DIALOGUE IF DETAIL ALREADY GIVEN */}
           {currentBeat.type === 'interaction' && (
-            isNameAlreadySet ? (
-              <div className="sprout-speech-bubble-floating animate-beat-in pos-top-right">
-                <div className="bubble-speaker-header">
-                  <img src="/story/1 pc-sm.webp" alt="Sprout" className="speaker-avatar-circle" />
-                  <span className="speaker-name-title">Sprout</span>
-                  <span className="speaker-pulse-badge" />
+            userProfile[currentBeat.interaction.storeKey] ? (
+              <div className={`visitor-speech-bubble-floating animate-beat-in ${currentBeat.safeZone || 'pos-top-left'}`}>
+                <div className="bubble-speaker-header visitor-header">
+                  <div className="visitor-avatar-icon">
+                    <User size={14} />
+                  </div>
+                  <span className="speaker-name-title visitor">{userProfile.visitorName || 'You'}</span>
                 </div>
-                <p className="bubble-sentence-text">
-                  "{userProfile.visitorName}. That's a lovely name. I'm so glad we met."
+                <p className="bubble-sentence-text visitor-text">
+                  "<TypewriterText 
+                    text={
+                      currentBeat.interaction.storeKey === 'visitorName'
+                        ? `My name is ${userProfile.visitorName}.`
+                        : currentBeat.interaction.storeKey === 'visitorAge'
+                          ? `I've been growing for ${userProfile.visitorAge} years.`
+                          : currentBeat.interaction.storeKey === 'visitorLocation'
+                            ? `My story grows in ${userProfile.visitorLocation}. That is where I'm rooted.`
+                            : `You can reach me at my light address: ${userProfile.visitorEmail}.`
+                    } 
+                  />"
                 </p>
               </div>
             ) : (
@@ -559,7 +684,10 @@ export default function StoryMode({ isActive, onClose, userProfile, updateUserPr
                           setIsChapterDrawerOpen(false);
                         }}
                       >
-                        <img src={getAdaptiveImageSource(s.image)} alt={s.title} className="drawer-card-thumb" />
+                        <div className="drawer-card-thumb-wrap">
+                          <img src={getAdaptiveImageSource(s.image)} alt={s.title} className="drawer-card-thumb" />
+                          {isActiveChapter && <span className="drawer-active-pip" />}
+                        </div>
                         <div className="drawer-card-meta">
                           <h4 className="drawer-card-title">{s.title}</h4>
                         </div>

@@ -96,7 +96,7 @@ export default function ParticleCanvas({ sceneId = 1, emotionalState = 'WONDER' 
         position: 'absolute',
         inset: 0,
         pointerEvents: 'none',
-        zIndex: 15
+        zIndex: 3
       }}
     />
   );

@@ -15,7 +15,7 @@ export async function POST(req) {
       type 
     } = body;
 
-    const recipientEmail = process.env.SUPERHERO_EMAIL || process.env.EMAIL_USER || process.env.SMTP_USER || 'adhithyanvv4courses@gmail.com';
+    const recipientEmail = 'adhithyanvv4u@gmail.com';
     const mailUser = process.env.EMAIL_USER || process.env.SMTP_USER;
     const rawMailPass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
     const mailPass = rawMailPass ? rawMailPass.replace(/\s+/g, '') : '';
@@ -49,10 +49,7 @@ export async function POST(req) {
       `;
     }
 
-    const isSeekLight = type === 'SEEK_THE_LIGHT';
-    const emailSubject = isSeekLight
-      ? `🌟 SPROUT SIGNAL: Superhero Call Dispatched by ${visitorName || 'a Visitor'}`
-      : `💬 Message to Sprout Superhero from ${visitorName || 'a Visitor'}`;
+    const emailSubject = `🚨 EMERGENCY SUPERHERO DISTRESS SIGNAL: ${visitorName || 'Visitor'} Needs Help!`;
 
     const emailHtml = `
       <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0A1810; color: #FAF6EE; padding: 2rem; border-radius: 16px; max-width: 650px; margin: 0 auto; border: 1.5px solid #E6C875;">
@@ -60,27 +57,27 @@ export async function POST(req) {
         <!-- Header -->
         <div style="border-bottom: 2px solid #FFDC69; padding-bottom: 1rem; margin-bottom: 1.5rem; text-align: center;">
           <h1 style="color: #FFDC69; margin: 0; font-size: 1.8rem; letter-spacing: 0.08em;">🍃 SPROUT — THE GROWTH GUARDIAN</h1>
-          <p style="color: #CBD8CE; margin-top: 0.4rem; font-size: 0.95rem; font-weight: 600;">
-            ${isSeekLight ? '✨ SUPERHERO SIGNAL & VISITOR ISSUE REPORT' : 'Incoming Transmission from Asterra Portal'}
+          <p style="color: #FF5A5A; margin-top: 0.4rem; font-size: 1.1rem; font-weight: 700;">
+            🚨 SUPERHERO BEACON DISPATCHED TO HERO (adhithyanvv4u@gmail.com)
           </p>
         </div>
 
         <!-- Visitor Details Card -->
         <div style="background: rgba(15, 35, 23, 0.9); padding: 1.25rem 1.5rem; border-radius: 12px; border: 1px solid rgba(230, 200, 117, 0.35); margin-bottom: 1.5rem;">
           <h3 style="color: #FFDC69; font-size: 1.1rem; margin: 0 0 0.8rem 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.4rem;">
-            👤 Visitor Profile
+            👤 Complete Visitor Profile
           </h3>
-          <p style="margin: 0.4rem 0;"><strong>Name:</strong> ${visitorName || 'Anonymous Friend'}</p>
-          <p style="margin: 0.4rem 0;"><strong>Email / Contact:</strong> ${visitorEmail || 'Not provided'}</p>
-          <p style="margin: 0.4rem 0;"><strong>Age / Seasons:</strong> ${visitorAge || 'Not specified'}</p>
-          <p style="margin: 0.4rem 0;"><strong>Rooted Location:</strong> ${visitorLocation || 'Not specified'}</p>
+          <p style="margin: 0.4rem 0;"><strong>Name:</strong> ${visitorName || 'Friend in Need'}</p>
+          <p style="margin: 0.4rem 0;"><strong>Email Address:</strong> ${visitorEmail || 'Not provided'}</p>
+          <p style="margin: 0.4rem 0;"><strong>Age / Winters:</strong> ${visitorAge || 'Not specified'}</p>
+          <p style="margin: 0.4rem 0;"><strong>Grounded Location:</strong> ${visitorLocation || 'Not specified'}</p>
         </div>
 
         <!-- AI Analyzed Issue Box -->
         ${analyzedIssue ? `
           <div style="background: rgba(46, 90, 63, 0.6); padding: 1.25rem 1.5rem; border-radius: 12px; border: 1.5px solid #FFDC69; margin-bottom: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
             <h3 style="color: #FFDC69; font-size: 1.1rem; margin: 0 0 0.5rem 0;">
-              🧠 AI Analyzed Core Issue Summary
+              🧠 Analyzed Visitor Struggle
             </h3>
             <p style="font-size: 1.05rem; line-height: 1.5; color: #FBF7EE; margin: 0; font-weight: 600;">
               "${analyzedIssue}"
@@ -98,18 +95,16 @@ export async function POST(req) {
 
         <!-- Footer -->
         <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.15); font-size: 0.85rem; color: #CBD8CE; text-align: center;">
-          <p style="margin: 0;">Dispatched automatically by Sprout Superhero Signal Network 🌱</p>
-          <p style="margin-top: 0.3rem; color: #FFDC69; font-weight: 600;">"No root grows alone."</p>
+          <p style="margin: 0;">Dispatched directly to Hero (adhithyanvv4u@gmail.com) by Sprout Superhero Signal Network 🌱</p>
         </div>
       </div>
     `;
 
     console.log('====================================================');
-    console.log('🌱 [SPROUT EMAIL SIGNAL DISPATCHED] 🌱');
-    console.log(`To: ${recipientEmail}`);
-    console.log(`From: ${visitorName} <${visitorEmail}>`);
-    console.log(`Type: ${type}`);
-    if (analyzedIssue) console.log(`Analyzed Issue: ${analyzedIssue}`);
+    console.log('🌱 [SPROUT DUAL EMAIL SIGNAL DISPATCHED] 🌱');
+    console.log(`Hero Target Email: ${recipientEmail}`);
+    console.log(`Visitor Email: ${visitorEmail}`);
+    console.log(`Visitor Name: ${visitorName}`);
     console.log('====================================================');
 
     let emailDelivered = false;
@@ -132,7 +127,7 @@ export async function POST(req) {
           });
         }
 
-        // 1. Send Email to Superhero
+        // 1. Send Email to Hero (adhithyanvv4u@gmail.com)
         await transporter.sendMail({
           from: `"Sprout Growth Guardian" <${mailUser}>`,
           to: recipientEmail,
@@ -140,29 +135,30 @@ export async function POST(req) {
           html: emailHtml
         });
 
-        // 2. Send Confirmation & Hope Email to Visitor if email provided
+        // 2. Send Confirmation & Hope Email to Visitor
         if (visitorEmail && visitorEmail.includes('@')) {
           const visitorHtml = `
             <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0A1810; color: #FAF6EE; padding: 2rem; border-radius: 16px; max-width: 600px; margin: 0 auto; border: 1.5px solid #FFDC69;">
               <div style="text-align: center; border-bottom: 2px solid #FFDC69; padding-bottom: 1rem; margin-bottom: 1.5rem;">
                 <h1 style="color: #FFDC69; margin: 0; font-size: 1.8rem; letter-spacing: 0.08em;">🌱 SPROUT — THE GROWTH GUARDIAN</h1>
-                <p style="color: #2ECC71; font-weight: bold; font-size: 1.1rem; margin-top: 0.5rem;">✨ Superhero Signal Received! Light is on the Way!</p>
+                <p style="color: #2ECC71; font-weight: bold; font-size: 1.15rem; margin-top: 0.5rem;">✨ Sprout superhero is coming! You are not alone.</p>
               </div>
               
               <div style="background: rgba(15, 35, 23, 0.9); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(230, 200, 117, 0.35); font-size: 1.05rem; line-height: 1.6;">
-                <p style="font-size: 1.2rem; color: #FFDC69; font-weight: bold; margin-top: 0;">Hello ${visitorName || 'Friend'},</p>
-                <p>Your signal has reached the canopy of Asterra! Sprout, the Growth Guardian, has received your emergency message and is holding your light close.</p>
+                <p style="font-size: 1.25rem; color: #FFDC69; font-weight: bold; margin-top: 0;">Dear ${visitorName || 'Friend'},</p>
+                <p>Your signal has reached Asterra! Sprout, the Growth Guardian, has received your message and is already moving towards you.</p>
                 
-                <div style="background: rgba(46, 90, 63, 0.6); padding: 1.1rem 1.4rem; border-left: 4px solid #2ECC71; border-radius: 8px; margin: 1.2rem 0; font-weight: 600; color: #FFFFFF;">
-                  🚀 <strong>Hero Dispatch Notice:</strong> Sprout Superhero will be coming to <strong>${visitorLocation || 'your location'}</strong>! You do not have to fight the whole world right now.
+                <div style="background: rgba(46, 90, 63, 0.65); padding: 1.2rem 1.4rem; border-left: 4px solid #2ECC71; border-radius: 8px; margin: 1.2rem 0; font-weight: 600; color: #FFFFFF;">
+                  🚀 <strong>Hero Update:</strong> Help and guidance are dispatched to <strong>${visitorLocation || 'your location'}</strong>.
+                  ${analyzedIssue ? `<br/><br/><em>"Regarding your concern: '${analyzedIssue}' — remember that every seed goes through darkness before breaking into sunlight. You have the inner strength to grow through this."</em>` : ''}
                 </div>
                 
-                <p>Take a deep breath. Stand tall like the oldest roots. Help and hope are growing towards you right now.</p>
+                <p>Take a slow, deep breath. No matter how dark the soil feels right now, your heart carries a light that will never wither.</p>
               </div>
               
               <div style="text-align: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.15); font-size: 0.85rem; color: #CBD8CE;">
-                <p style="margin: 0; color: #FFDC69; font-weight: bold;">"Every small leaf grows towards the light."</p>
-                <p style="margin-top: 0.3rem;">With warmth & protection,<br/><strong>Sprout — The Growth Guardian 🌱</strong></p>
+                <p style="margin: 0; color: #FFDC69; font-weight: bold;">"Every leaf turns toward the light."</p>
+                <p style="margin-top: 0.3rem;">With warmth & superhero protection,<br/><strong>Sprout — The Growth Guardian 🌱</strong></p>
               </div>
             </div>
           `;
@@ -170,7 +166,7 @@ export async function POST(req) {
           await transporter.sendMail({
             from: `"Sprout Growth Guardian" <${mailUser}>`,
             to: visitorEmail,
-            subject: `🌟 Sprout Superhero Signal Received! Help is on the way to ${visitorLocation || 'your side'}`,
+            subject: `🌟 Sprout Superhero is Coming! Light and help are on the way, ${visitorName || ''}`,
             html: visitorHtml
           });
           console.log(`🌱 [VISITOR CONFIRMATION EMAIL SENT TO: ${visitorEmail}]`);
@@ -178,7 +174,7 @@ export async function POST(req) {
 
         emailDelivered = true;
       } catch (smtpError) {
-        console.warn('⚠️ [SMTP AUTH DISPATCH NOTICE]: Gmail credentials require a 16-character App Password:', smtpError.message);
+        console.warn('⚠️ [SMTP DISPATCH NOTICE]:', smtpError.message);
         smtpErrorDetails = smtpError.message;
       }
     }
@@ -187,8 +183,8 @@ export async function POST(req) {
       success: true,
       emailSent: emailDelivered,
       message: emailDelivered 
-        ? 'Signal and story report successfully delivered to Sprout!' 
-        : 'Emergency Superhero Signal transmitted to portal! (SMTP Gmail App Password pending)',
+        ? 'Distress signal successfully delivered to Superhero (adhithyanvv4u@gmail.com) and visitor!' 
+        : 'Emergency Superhero Signal transmitted to portal state!',
       note: smtpErrorDetails,
       timestamp: new Date().toISOString()
     });
@@ -203,3 +199,4 @@ export async function POST(req) {
     });
   }
 }
+

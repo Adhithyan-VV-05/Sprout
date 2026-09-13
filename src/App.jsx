@@ -24,6 +24,7 @@ export default function App() {
 
       {/* Hero Section */}
       <HeroSection 
+        isStoryActive={isStoryActive}
         onStartStory={() => setIsStoryActive(true)}
         userProfile={userProfile}
         updateUserProfile={updateUserProfile}
