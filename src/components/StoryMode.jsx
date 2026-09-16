@@ -1,705 +1,517 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, ChevronRight, BookOpen, User, Sparkles, ArrowDown } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, ChevronRight, ChevronLeft, ArrowRight, RotateCcw, Heart } from 'lucide-react';
 import { STORY_SCENES } from '../data/storyData';
 import ParticleCanvas from './ParticleCanvas';
-import { getAdaptiveImageSource, getBlurPlaceholder, isMobileViewport } from '../services/imageOptimizer';
 
-export default function StoryMode({ isActive, onClose, userProfile, updateUserProfile }) {
+const renderTextWithPlaceholders = (text) => {
+  if (typeof text !== 'string') return text;
+  const parts = text.split(/(\[[^\]]+\])/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('[') && part.endsWith(']')) {
+      return (
+        <span key={index} className="faded-placeholder-blank">
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
+};
+
+export default function StoryMode({ 
+  isActive, 
+  onClose, 
+  onStoryFinished, 
+  userProfile, 
+  updateUserProfile, 
+  initialSceneId = 1 
+}) {
   const [beatIndex, setBeatIndex] = useState(0);
-  const [inputValue, setInputValue] = useState('');
-  const [validationMsg, setValidationMsg] = useState('');
-  const [showPortalTransition, setShowPortalTransition] = useState(true);
-  const [isChapterDrawerOpen, setIsChapterDrawerOpen] = useState(false);
-  const [showEndingFade, setShowEndingFade] = useState(false);
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth <= 768);
+  const [localName, setLocalName] = useState(userProfile?.visitorName || '');
+  const [localLocation, setLocalLocation] = useState(userProfile?.visitorLocation || '');
+  const [localEmail, setLocalEmail] = useState(userProfile?.visitorEmail || '');
+  const [localAge, setLocalAge] = useState(userProfile?.visitorAge || '');
+  const [hasClicked, setHasClicked] = useState(false);
+  
+  // Validation error states
+  const [nameError, setNameError] = useState(false);
+  const [ageError, setAgeError] = useState(false);
 
-  // Background Image & Preloading State
-  const [bgImageSrc, setBgImageSrc] = useState('');
-  const [bgBlurSrc, setBgBlurSrc] = useState('');
-  const [isBgLoaded, setIsBgLoaded] = useState(false);
-  const [isImageLoading, setIsImageLoading] = useState(false);
+  useEffect(() => {
+    const handleFirstInteraction = () => setHasClicked(true);
+    window.addEventListener('click', handleFirstInteraction, { once: true });
+    window.addEventListener('keydown', handleFirstInteraction, { once: true });
+    return () => {
+      window.removeEventListener('click', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+  }, []);
 
-  const containerRef = useRef(null);
+  useEffect(() => {
+    if (userProfile?.visitorName) setLocalName(userProfile.visitorName);
+    if (userProfile?.visitorLocation) setLocalLocation(userProfile.visitorLocation);
+    if (userProfile?.visitorEmail) setLocalEmail(userProfile.visitorEmail);
+    if (userProfile?.visitorAge) setLocalAge(userProfile.visitorAge);
+  }, [userProfile]);
 
-  // Typewriter Helper Component (No cursor at end, simple smooth typing feel)
-  const TypewriterText = ({ text, speed = 25 }) => {
-    const [displayedText, setDisplayedText] = useState('');
-
-    useEffect(() => {
-      if (!text) {
-        setDisplayedText('');
-        return;
-      }
-
-      setDisplayedText('');
-      let currentIndex = 0;
-      const timer = setInterval(() => {
-        currentIndex++;
-        setDisplayedText(text.slice(0, currentIndex));
-        if (currentIndex >= text.length) {
-          clearInterval(timer);
-        }
-      }, speed);
-
-      return () => clearInterval(timer);
-    }, [text, speed]);
-
-    return <>{displayedText}</>;
-  };
-
-  // Flatten all 18 scenes into individual discrete beats with safeZone metadata
+  // Flatten scenes into clean structured narrative beats
   const flatBeats = useMemo(() => {
     const beats = [];
+    
     STORY_SCENES.forEach((scene) => {
-      const sceneSafeZone = scene.safeZone || 'pos-top-left';
-
-      // Narrative beats
-      if (scene.beats) {
+      if (scene.beats && scene.beats.length > 0) {
         scene.beats.forEach((b) => {
           beats.push({
             sceneId: scene.id,
             sceneTitle: scene.title,
+            heading: scene.heading,
             sceneCounter: scene.sceneCounter,
             image: scene.image,
             emotionalState: scene.emotionalState,
-            safeZone: sceneSafeZone,
             type: b.type || 'narrative',
+            speaker: b.speaker,
             text: b.text
           });
         });
       }
-
-      // Wither Dialogue
-      if (scene.witherDialogue) {
-        beats.push({
-          sceneId: scene.id,
-          sceneTitle: scene.title,
-          sceneCounter: scene.sceneCounter,
-          image: scene.image,
-          emotionalState: scene.emotionalState,
-          safeZone: sceneSafeZone,
-          type: 'wither',
-          speaker: 'wither',
-          text: scene.witherDialogue
-        });
-      }
-
-      // Sprout Dialogue
-      if ((scene.sproutVO || scene.sproutDialogue) && !scene.sproutHighlightBeats) {
-        beats.push({
-          sceneId: scene.id,
-          sceneTitle: scene.title,
-          sceneCounter: scene.sceneCounter,
-          image: scene.image,
-          emotionalState: scene.emotionalState,
-          safeZone: sceneSafeZone,
-          type: 'sprout',
-          speaker: 'sprout',
-          text: scene.sproutVO || scene.sproutDialogue
-        });
-      }
-
-      // Visitor Dialogue
-      if (scene.visitorDialogue) {
-        beats.push({
-          sceneId: scene.id,
-          sceneTitle: scene.title,
-          sceneCounter: scene.sceneCounter,
-          image: scene.image,
-          emotionalState: scene.emotionalState,
-          safeZone: sceneSafeZone,
-          type: 'visitor',
-          speaker: 'visitor',
-          text: scene.visitorDialogue
-        });
-      }
-
-      // Interactive Choice Card
-      if (scene.interaction) {
-        beats.push({
-          sceneId: scene.id,
-          sceneTitle: scene.title,
-          sceneCounter: scene.sceneCounter,
-          image: scene.image,
-          emotionalState: scene.emotionalState,
-          safeZone: sceneSafeZone,
-          type: 'interaction',
-          interaction: scene.interaction
-        });
-      }
-
-      // Golden Highlight Beats (Scene 15)
-      if (scene.sproutHighlightBeats) {
-        scene.sproutHighlightBeats.forEach((hb) => {
-          beats.push({
-            sceneId: scene.id,
-            sceneTitle: scene.title,
-            sceneCounter: scene.sceneCounter,
-            image: scene.image,
-            emotionalState: scene.emotionalState,
-            safeZone: sceneSafeZone,
-            type: 'highlight',
-            text: hb
-          });
-        });
-      }
-
-      // Power Reveal Badge
-      if (scene.powerReveal) {
-        beats.push({
-          sceneId: scene.id,
-          sceneTitle: scene.title,
-          sceneCounter: scene.sceneCounter,
-          image: scene.image,
-          emotionalState: scene.emotionalState,
-          safeZone: sceneSafeZone,
-          type: 'power',
-          text: scene.powerReveal
-        });
-      }
-
-      // Final VO Beats
-      if (scene.finalVOBeats) {
-        scene.finalVOBeats.forEach((fb) => {
-          beats.push({
-            sceneId: scene.id,
-            sceneTitle: scene.title,
-            sceneCounter: scene.sceneCounter,
-            image: scene.image,
-            emotionalState: scene.emotionalState,
-            safeZone: sceneSafeZone,
-            type: 'narrative',
-            text: fb
-          });
-        });
-      }
     });
+
     return beats;
   }, []);
 
-  // Track viewport size changes for mobile/desktop image swapping
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Reset active state when story mode opens
+  // Lock background body scroll
   useEffect(() => {
     if (isActive) {
-      setShowPortalTransition(true);
-      setBeatIndex(0);
-      setValidationMsg('');
-      setIsChapterDrawerOpen(false);
-      setShowEndingFade(false);
-      const timer = setTimeout(() => {
-        setShowPortalTransition(false);
-      }, 1100);
-      return () => clearTimeout(timer);
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
     }
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [isActive]);
 
-  const currentBeat = flatBeats[beatIndex] || flatBeats[0];
-
-  // Network Adaptive & Pre-warming Image Loading Effect with Loading Indicator
-  // Re-runs when mobile state changes to swap between PC and mobile images
+  // Jump to initialSceneId when opened
   useEffect(() => {
-    if (!currentBeat || !currentBeat.image) return;
+    if (isActive) {
+      if (initialSceneId && initialSceneId > 1) {
+        const targetIdx = flatBeats.findIndex((b) => b.sceneId === initialSceneId);
+        if (targetIdx !== -1) {
+          setBeatIndex(targetIdx);
+          return;
+        }
+      }
+      setBeatIndex(0);
+    }
+  }, [isActive, initialSceneId, flatBeats]);
 
-    const adaptiveSrc = getAdaptiveImageSource(currentBeat.image);
-    const blurSrc = getBlurPlaceholder(currentBeat.image);
+  const currentBeat = flatBeats[beatIndex] || flatBeats[0] || {};
+  const isFinalBeat = beatIndex >= flatBeats.length - 1;
+  const progressPercent = ((beatIndex + 1) / flatBeats.length) * 100;
 
-    setBgBlurSrc(blurSrc);
+  // Preload chapter images
+  useEffect(() => {
+    if (!isActive) return;
+    STORY_SCENES.forEach((scene) => {
+      if (scene.image) {
+        const img = new Image();
+        img.src = scene.image;
+      }
+    });
+  }, [isActive]);
 
-    // Force reload when switching between mobile and desktop
-    if (bgImageSrc !== adaptiveSrc) {
-      setIsImageLoading(true);
-      setIsBgLoaded(false);
+  const getSpeakerBgClass = (speaker) => {
+    if (!speaker) return 'bg-narration';
+    if (speaker.toLowerCase().includes('sprout')) return 'bg-sprout';
+    return 'bg-roboman';
+  };
 
-      const img = new Image();
-      img.src = adaptiveSrc;
-      img.onload = () => {
-        setBgImageSrc(adaptiveSrc);
-        setIsBgLoaded(true);
-        setIsImageLoading(false);
-      };
-      img.onerror = () => {
-        setBgImageSrc(adaptiveSrc);
-        setIsImageLoading(false);
-      };
+  const handleNext = () => {
+    // Reset errors first
+    setNameError(false);
+    setAgeError(false);
+
+    if (currentBeat?.type === 'interactive-name') {
+      if (!localName.trim() || /\d/.test(localName)) {
+        setNameError(true);
+        return;
+      }
+    }
+    if (currentBeat?.type === 'interactive-location' && !localLocation.trim()) return;
+    if (currentBeat?.type === 'interactive-email' && !localEmail.trim()) return;
+    if (currentBeat?.type === 'interactive-age') {
+      const ageNum = parseInt(localAge.trim(), 10);
+      if (!localAge.trim() || !/^\d+$/.test(localAge.trim()) || isNaN(ageNum) || ageNum >= 150) {
+        setAgeError(true);
+        return;
+      }
     }
 
-    const nextBeat = flatBeats[beatIndex + 1];
-    if (nextBeat && nextBeat.image) {
-      const nextAdaptiveSrc = getAdaptiveImageSource(nextBeat.image);
-      const prewarmImg = new Image();
-      prewarmImg.src = nextAdaptiveSrc;
-    }
-  }, [currentBeat, beatIndex, flatBeats, bgImageSrc, isMobile]);
-
-  // Check if mandatory input is pending
-  const isInputPending = currentBeat && currentBeat.type === 'interaction' && (
-    (currentBeat.interaction.storeKey === 'visitorName' && !userProfile.visitorName) ||
-    (currentBeat.interaction.storeKey === 'visitorAge' && !userProfile.visitorAge) ||
-    (currentBeat.interaction.storeKey === 'visitorLocation' && !userProfile.visitorLocation) ||
-    (currentBeat.interaction.storeKey === 'visitorEmail' && !userProfile.visitorEmail)
-  );
-
-  // Click Viewport to Advance Beat or Trigger Ending Screen
-  const handleViewportClick = (e) => {
-    if (
-      e.target.closest('input') ||
-      e.target.closest('button') ||
-      e.target.closest('.cinematic-input-card') ||
-      e.target.closest('.story-top-navbar') ||
-      e.target.closest('.chapter-drawer-overlay')
-    ) {
-      return;
-    }
-
-    if (isInputPending) return;
-
-    if (showEndingFade) {
-      onClose();
-      return;
-    }
-
-    if (beatIndex >= flatBeats.length - 1) {
-      setShowEndingFade(true);
-    } else {
+    if (beatIndex < flatBeats.length - 1) {
       setBeatIndex((prev) => prev + 1);
     }
   };
 
-  // Keyboard and Wheel Scroll Listener
+  const handlePrev = () => {
+    if (beatIndex > 0) {
+      setBeatIndex((prev) => prev - 1);
+    }
+  };
+
+  // Keyboard Navigation
   useEffect(() => {
-    if (!isActive || showPortalTransition || isChapterDrawerOpen) return;
-
-    let touchStartY = 0;
-
-    const handleWheel = (e) => {
-      e.preventDefault();
-      if (isInputPending) return;
-      if (e.deltaY > 20) {
-        if (beatIndex >= flatBeats.length - 1) {
-          setShowEndingFade(true);
-        } else {
-          setBeatIndex((prev) => Math.min(flatBeats.length - 1, prev + 1));
-        }
-      } else if (e.deltaY < -20) {
-        if (showEndingFade) {
-          setShowEndingFade(false);
-        } else {
-          setBeatIndex((prev) => Math.max(0, prev - 1));
-        }
-      }
-    };
-
-    const handleTouchStart = (e) => {
-      touchStartY = e.touches[0].clientY;
-    };
-
-    const handleTouchMove = (e) => {
-      if (!touchStartY || isInputPending) return;
-      const touchY = e.touches[0].clientY;
-      const diffY = touchStartY - touchY;
-      if (diffY > 40) {
-        if (beatIndex >= flatBeats.length - 1) {
-          setShowEndingFade(true);
-        } else {
-          setBeatIndex((prev) => Math.min(flatBeats.length - 1, prev + 1));
-        }
-        touchStartY = touchY;
-      } else if (diffY < -40) {
-        if (showEndingFade) {
-          setShowEndingFade(false);
-        } else {
-          setBeatIndex((prev) => Math.max(0, prev - 1));
-        }
-        touchStartY = touchY;
-      }
-    };
+    if (!isActive) return;
 
     const handleKeyDown = (e) => {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
-        if (!isInputPending) {
-          if (beatIndex >= flatBeats.length - 1) {
-            setShowEndingFade(true);
-          } else {
-            setBeatIndex((prev) => Math.min(flatBeats.length - 1, prev + 1));
-          }
-        }
-      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-        if (showEndingFade) {
-          setShowEndingFade(false);
-        } else {
-          setBeatIndex((prev) => Math.max(0, prev - 1));
-        }
+      if (['INPUT', 'TEXTAREA'].includes(e.target?.tagName)) return;
+
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        handleNext();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handlePrev();
       } else if (e.key === 'Escape') {
-        if (isChapterDrawerOpen) {
-          setIsChapterDrawerOpen(false);
-        } else {
-          onClose();
-        }
+        onClose();
       }
     };
 
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    window.addEventListener('touchstart', handleTouchStart);
-    window.addEventListener('touchmove', handleTouchMove);
     window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isActive, beatIndex, flatBeats, onClose]);
 
-    return () => {
-      window.removeEventListener('wheel', handleWheel);
-      window.removeEventListener('touchstart', handleTouchStart);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isActive, showPortalTransition, isChapterDrawerOpen, flatBeats.length, beatIndex, showEndingFade, isInputPending, onClose]);
-
-  if (!isActive) return null;
-
-  const handleInteractionSubmit = async (e) => {
-    e.preventDefault();
-    if (!currentBeat.interaction) return;
-
-    if (currentBeat.interaction.type === 'EMAIL' && !inputValue.includes('@')) {
-      setValidationMsg(currentBeat.interaction.validationError || "That light address doesn't seem quite ready yet.");
+  const handleScreenClick = (e) => {
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('.no-screen-click')) {
       return;
     }
+    handleNext();
+  };
 
-    setValidationMsg('');
-    const val = inputValue.trim();
-    updateUserProfile(currentBeat.interaction.storeKey, val);
-
+  const handleReturnToSprout = () => {
+    // Dispatch complete info collected email to both hero and visitor
     try {
       fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          visitorName: currentBeat.interaction.storeKey === 'visitorName' ? val : userProfile.visitorName,
-          visitorEmail: currentBeat.interaction.type === 'EMAIL' ? val : userProfile.visitorEmail,
-          visitorAge: currentBeat.interaction.type === 'AGE' ? val : userProfile.visitorAge,
-          visitorLocation: currentBeat.interaction.type === 'LOCATION' ? val : userProfile.visitorLocation,
-          message: `Submitted ${currentBeat.interaction.type} choice: "${val}"`,
-          type: 'STORY_INTERACTION'
+          visitorName: userProfile?.visitorName || localName || 'Friend in Asterra',
+          visitorEmail: userProfile?.visitorEmail || localEmail,
+          visitorAge: userProfile?.visitorAge || localAge,
+          visitorLocation: userProfile?.visitorLocation || localLocation,
+          visitorGender: userProfile?.visitorGender,
+          message: `Story Completed! Information collected during Sprout's Journey: Name: ${userProfile?.visitorName || localName || 'Friend'}, Location: ${userProfile?.visitorLocation || localLocation || 'N/A'}, Age: ${userProfile?.visitorAge || localAge || 'N/A'}, Email: ${userProfile?.visitorEmail || localEmail || 'N/A'}.`,
+          analyzedIssue: 'Story Mode Completed — Information Collected',
+          type: 'STORY_COMPLETE'
         })
       });
     } catch (err) {
-      console.warn('API email dispatch:', err);
+      console.warn('Final story email dispatch notice:', err);
     }
 
-    setInputValue('');
-    setBeatIndex((prev) => Math.min(flatBeats.length - 1, prev + 1));
+    if (onStoryFinished) {
+      onStoryFinished();
+    } else {
+      onClose();
+    }
   };
 
-  const formatText = (text) => {
-    if (!text) return '';
-    return text
-      .replace('{visitorName}', userProfile.visitorName || '')
-      .replace('{visitorAge}', userProfile.visitorAge || '')
-      .replace('{visitorLocation}', userProfile.visitorLocation || '');
-  };
+  if (!isActive) return null;
 
   return (
     <div 
-      className="scroll-story-viewport active" 
-      ref={containerRef}
-      onClick={handleViewportClick}
+      className="fullscreen-story-modal-overlay" 
+      onClick={handleScreenClick}
     >
-      {/* Film Grain & Letterbox */}
-      <div className="film-grain-overlay" />
-      <div className="cinematic-letterbox-top" />
-      <div className="cinematic-letterbox-bottom" />
+      {!hasClicked && (
+        <div className="center-click-hint-overlay">
+          <div className="center-pulse-text">
+            Click anywhere or press Space to continue
+          </div>
+        </div>
+      )}
 
-      {/* Portal Transition */}
-      {showPortalTransition ? (
-        <div className="story-transition-portal-overlay">
-          <div className="portal-circle-container">
-            <div className="portal-ring-spinning" />
-            <img 
-              src="/story/1 pc-sm.webp" 
-              alt="Sprout World Portal" 
-              className="portal-avatar-img" 
+      {/* 1. Fullscreen Cinematic Background Layers */}
+      <div className="story-slides-backdrop-container">
+        {STORY_SCENES.map((scene) => {
+          const isCurrentScene = scene.id === (currentBeat?.sceneId || 1);
+          return (
+            <div
+              key={scene.id}
+              className={`story-slide-image-layer ${isCurrentScene ? 'active-layer' : 'hidden-layer'}`}
+              style={{
+                backgroundImage: `url('${scene.image}')`
+              }}
             />
-          </div>
-          <div className="portal-caption">Entering Sprout's World...</div>
-          <div className="portal-subcaption">Step into the story of Asterra</div>
-          <div className="portal-arrow">↓</div>
-        </div>
-      ) : showEndingFade ? (
-        /* SLOW 2-SECOND ENDING FADE OVERLAY */
-        <div className="story-ending-fade-overlay" onClick={onClose}>
+          );
+        })}
+        {/* Soft bottom atmospheric gradient for text readability */}
+        <div className="minimal-story-scrim" />
+      </div>
+
+      {/* 2. Ambient Particles */}
+      <div className="story-ambient-particles">
+        <ParticleCanvas 
+          sceneId={currentBeat?.sceneId || 1} 
+          emotionalState={currentBeat?.emotionalState || 'WONDER'} 
+        />
+      </div>
+
+      {/* 3. Sleek Minimal Top Bar */}
+      <header className="minimal-story-header no-screen-click">
+        <div className="minimal-story-progress-line">
           <div 
-            className="ending-bg-image-layer" 
-            style={{ backgroundImage: `url('/story/18 pc.webp')` }} 
+            className="minimal-story-progress-fill" 
+            style={{ width: `${progressPercent}%` }} 
           />
-          <div className="ending-gradient-mask" />
-          <div className="ending-content-card animate-beat-in">
-            <img src="/story/1 pc-sm.webp" alt="Sprout" className="ending-sprout-avatar" />
-            <h2 className="ending-card-title">The Light Lives in You</h2>
-            <p className="ending-card-subtitle">
-              {userProfile.visitorName 
-                ? `Thank you for walking with Sprout, ${userProfile.visitorName}. Asterra will always remember your kindness.` 
-                : "Thank you for stepping into Sprout's story. Every seed carries hope."}
-            </p>
-            <p className="ending-card-subtitle" style={{ fontSize: '0.95rem', opacity: 0.88, fontStyle: 'italic', marginTop: '-0.4rem' }}>
-              Not all superheroes arrive with strength or speed. Some arrive with a soft word, a moment of stillness, and the courage to truly listen. That is Sprout’s power — and it lives in every one of us.
-            </p>
-            <button 
-              type="button" 
-              className="ref-btn-primary-explore interactive" 
-              onClick={onClose}
-              style={{ marginTop: '0.5rem' }}
-            >
-              <span>Return to Hero</span>
-              <ChevronRight size={18} />
-            </button>
-          </div>
         </div>
-      ) : (
-        <>
-          {/* Instant Blur Placeholder Background */}
-          {bgBlurSrc && (
-            <div 
-              className="story-background-blur-placeholder"
-              style={{ backgroundImage: `url('${bgBlurSrc}')` }}
-            />
+
+        <div className="minimal-story-header-content">
+          <div className="minimal-story-chapter-label">
+            <span className="chapter-num-pill">CHAPTER {currentBeat?.sceneCounter || '01 / 12'}</span>
+            <span className="chapter-sep">·</span>
+            <span className="chapter-name">{currentBeat?.sceneTitle}</span>
+          </div>
+
+          <button
+            type="button"
+            className="minimal-story-close-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            title="Close Story (Esc)"
+            aria-label="Close Story"
+          >
+            <X size={20} />
+          </button>
+        </div>
+      </header>
+
+      {/* 4. Minimal Story Narrative Text (Direct on background, NO CARD) */}
+      <main className="minimal-story-content-area">
+        <div key={beatIndex} className="minimal-story-text-wrapper story-text-fade-up">
+
+          {/* Heading - Only show for the first beat of a scene */}
+          {(beatIndex === 0 || flatBeats[beatIndex - 1].sceneId !== currentBeat.sceneId) && (
+            <div className="minimal-story-subheading">
+              {currentBeat.heading}
+            </div>
           )}
 
-          {/* 100% Fill Proper Background Image Layer */}
-          <div 
-            className={`story-background-layer ${isBgLoaded ? 'loaded' : ''}`}
-            style={{
-              backgroundImage: bgImageSrc ? `url('${bgImageSrc}')` : undefined
-            }}
-          />
-
-          {/* Living Particle Canvas */}
-          <ParticleCanvas sceneId={currentBeat.sceneId} emotionalState={currentBeat.emotionalState} />
-
-          {/* TOP BAR: BRAND + CLEAN CHAPTER TITLE */}
-          <div className="story-top-bar-redesigned">
-            {/* Top-Left Clean Chapter Title Pill (Only Chapter Title + Circular Spinner when loading next image) */}
-            <div 
-              className="story-top-chapter-pill interactive"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsChapterDrawerOpen(!isChapterDrawerOpen);
-              }}
-              title="Open Chapter Index"
-            >
-              {isImageLoading ? (
-                <span className="hud-small-spinner" title="New image loading..." />
-              ) : (
-                <BookOpen size={15} className="chapter-hud-icon" />
-              )}
-              <span className="chapter-hud-title-text">{currentBeat.sceneTitle}</span>
+          {/* 1. Scene Directions [Sprout approaches Robo-Man...] */}
+          {currentBeat.type === 'scene-direction' && (
+            <div className={`minimal-story-body-text scene-direction-beat ${getSpeakerBgClass(currentBeat.speaker)}`}>
+              <span className="scene-direction-bracket-text">{currentBeat.text}</span>
             </div>
+          )}
 
-            {/* Top-Right Close Control */}
-            <div className="story-ctrl-btns">
+          {/* 2. Standard Dialogue & Narrative */}
+          {currentBeat.type !== 'scene-direction' && 
+           !currentBeat.type?.startsWith('interactive-') && (
+            <div className={`minimal-story-body-text ${currentBeat.type || 'narrative'} ${getSpeakerBgClass(currentBeat.speaker)}`}>
+              {currentBeat.speaker && (
+                <span className={`minimal-speaker-prefix ${currentBeat.speaker.toLowerCase().includes('sprout') ? 'speaker-sprout' : 'speaker-other'}`}>
+                  {currentBeat.speaker}:
+                </span>
+              )}
+              <span>{renderTextWithPlaceholders(currentBeat.text)}</span>
+            </div>
+          )}
+
+          {/* 3. Robo-Man Question 1: Name */}
+          {currentBeat.type === 'interactive-name' && (
+            <div className={`minimal-story-body-text interactive-sentence-beat no-screen-click ${getSpeakerBgClass('Robo-Man')}`}>
+              <div className="sentence-with-speaker">
+                <span className="minimal-speaker-prefix speaker-other">Robo-Man:</span>
+                <span>
+                  “I still remember my mom calling me, ‘
+                  <input 
+                    type="text"
+                    className={`story-inline-blank name-blank ${nameError ? 'has-error' : ''}`}
+                    placeholder="[your name]"
+                    value={localName}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setLocalName(val);
+                      if (nameError) setNameError(false);
+                      if (updateUserProfile) updateUserProfile('visitorName', val);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleNext();
+                      }
+                    }}
+                    autoFocus
+                  />
+                  .’ We used to play games together.”
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* 4. Robo-Man Question 2: Location / Place */}
+          {currentBeat.type === 'interactive-location' && (
+            <div className={`minimal-story-body-text interactive-sentence-beat no-screen-click ${getSpeakerBgClass('Robo-Man')}`}>
+              <div className="sentence-with-speaker">
+                <span className="minimal-speaker-prefix speaker-other">Robo-Man:</span>
+                <span>
+                  “We lived in 
+                  <input 
+                    type="text"
+                    className="story-inline-blank location-blank"
+                    placeholder="[your place]"
+                    value={localLocation}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setLocalLocation(val);
+                      if (updateUserProfile) updateUserProfile('visitorLocation', val);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleNext();
+                      }
+                    }}
+                    autoFocus
+                  />
+                  , a place that was once a heaven.”
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* 5. Robo-Man Question 3: Email ID */}
+          {currentBeat.type === 'interactive-email' && (
+            <div className={`minimal-story-body-text interactive-sentence-beat no-screen-click ${getSpeakerBgClass('Robo-Man')}`}>
+              <div className="sentence-with-speaker">
+                <span className="minimal-speaker-prefix speaker-other">Robo-Man:</span>
+                <span>
+                  “I used to send emails to my son whenever he left for his studies, writing to him through my email ID, 
+                  <input 
+                    type="email"
+                    className="story-inline-blank email-blank"
+                    placeholder="[your mail ID]"
+                    value={localEmail}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setLocalEmail(val);
+                      if (updateUserProfile) updateUserProfile('visitorEmail', val);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleNext();
+                      }
+                    }}
+                    autoFocus
+                  />
+                  . It has been so long since I last saw him.”
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* 6. Robo-Man Question 4: Age */}
+          {currentBeat.type === 'interactive-age' && (
+            <div className={`minimal-story-body-text interactive-sentence-beat no-screen-click ${getSpeakerBgClass('Robo-Man')}`}>
+              <div className="sentence-with-speaker">
+                <span className="minimal-speaker-prefix speaker-other">Robo-Man:</span>
+                <span>
+                  “I have been living here for 
+                  <input 
+                    type="text"
+                    className={`story-inline-blank age-blank ${ageError ? 'has-error' : ''}`}
+                    placeholder="[your age]"
+                    value={localAge}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setLocalAge(val);
+                      if (ageError) setAgeError(false);
+                      if (updateUserProfile) updateUserProfile('visitorAge', val);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleNext();
+                      }
+                    }}
+                    autoFocus
+                  />
+                  years. But then, something happened that changed everything.”
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* 5. Final Beat: Return to Sprout Button */}
+          {isFinalBeat && (
+            <div className="minimal-story-finish-wrap no-screen-click">
               <button 
                 type="button" 
-                className="icon-circle-btn interactive" 
-                onClick={onClose}
-                title="Return to Hero"
+                className="minimal-finish-btn sprout-return-btn interactive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleReturnToSprout();
+                }}
               >
-                <X size={18} />
+                <span>Go Back to Sprout</span>
+                <ArrowRight size={16} />
               </button>
             </div>
+          )}
+
+        </div>
+      </main>
+
+      {/* 5. Minimal Bottom Navigation & Hints */}
+      <footer className="minimal-story-footer no-screen-click">
+        <div className="minimal-story-footer-inner">
+          <span className="minimal-advance-hint">
+            {isFinalBeat 
+              ? 'Journey Completed' 
+              : currentBeat?.type?.startsWith('interactive-')
+                ? 'Press Enter ↵ to continue'
+                : ''}
+          </span>
+
+          <div className="minimal-nav-arrows">
+            {beatIndex > 0 && (
+              <button 
+                type="button" 
+                className="minimal-arrow-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePrev();
+                }}
+                title="Previous (←)"
+                aria-label="Previous Beat"
+              >
+                <ChevronLeft size={20} />
+              </button>
+            )}
+
+            {!isFinalBeat && (
+              <button 
+                type="button" 
+                className="minimal-arrow-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNext();
+                }}
+                title="Next (→)"
+                aria-label="Next Beat"
+              >
+                <ChevronRight size={20} />
+              </button>
+            )}
           </div>
+        </div>
+      </footer>
 
-          {/* DYNAMIC BEAT CONTENT POSITIONING WITH SAFE ZONES */}
-          
-          {/* BEAT TYPE 1: SPROUT SPEECH BUBBLE */}
-          {currentBeat.type === 'sprout' && (
-            <div className={`sprout-speech-bubble-floating animate-beat-in ${currentBeat.safeZone || 'pos-top-right'}`}>
-              <div className="bubble-speaker-header">
-                <img src="/story/1 pc-sm.webp" alt="Sprout" className="speaker-avatar-circle" />
-                <span className="speaker-name-title">Sprout</span>
-                <span className="speaker-pulse-badge" />
-              </div>
-              <p className="bubble-sentence-text">
-                "<TypewriterText text={formatText(currentBeat.text)} />"
-              </p>
-            </div>
-          )}
-
-          {/* BEAT TYPE 2: VISITOR SPEECH BUBBLE */}
-          {currentBeat.type === 'visitor' && (
-            <div className={`visitor-speech-bubble-floating animate-beat-in ${currentBeat.safeZone || 'pos-top-left'}`}>
-              <div className="bubble-speaker-header visitor-header">
-                <div className="visitor-avatar-icon">
-                  <User size={14} />
-                </div>
-                <span className="speaker-name-title visitor">{userProfile.visitorName || 'You'}</span>
-              </div>
-              <p className="bubble-sentence-text visitor-text">
-                "<TypewriterText text={formatText(currentBeat.text)} />"
-              </p>
-            </div>
-          )}
-
-          {/* BEAT TYPE 3: WITHER SPEECH BUBBLE */}
-          {currentBeat.type === 'wither' && (
-            <div className="wither-speech-bubble-floating animate-beat-in pos-top-right">
-              <div className="bubble-speaker-header wither-header">
-                <span className="speaker-name-title wither">WITHER</span>
-              </div>
-              <p className="bubble-sentence-text wither-text">
-                "<TypewriterText text={currentBeat.text} />"
-              </p>
-            </div>
-          )}
-
-          {/* BEAT TYPE 4: NARRATIVE BEAT (CLEAN CENTERED CAPTION BAR) */}
-          {currentBeat.type === 'narrative' && (
-            <div className="single-sentence-caption-bar animate-beat-in">
-              <p className="narrative-single-line">
-                "<TypewriterText text={formatText(currentBeat.text)} />"
-              </p>
-            </div>
-          )}
-
-          {/* BEAT TYPE 5: GOLDEN HIGHLIGHT BEAT */}
-          {currentBeat.type === 'highlight' && (
-            <div className="golden-highlight-single-bar animate-beat-in">
-              <p className="golden-emotional-single-line">
-                "<TypewriterText text={formatText(currentBeat.text)} />"
-              </p>
-            </div>
-          )}
-
-          {/* BEAT TYPE 6: POWER REVEAL BADGE */}
-          {currentBeat.type === 'power' && (
-            <div className="power-reveal-single-badge animate-beat-in">
-              <span>{currentBeat.text}</span>
-            </div>
-          )}
-
-          {/* BEAT TYPE 7: INTERACTIVE INPUT CARD OR VISITOR DIALOGUE IF DETAIL ALREADY GIVEN */}
-          {currentBeat.type === 'interaction' && (
-            userProfile[currentBeat.interaction.storeKey] ? (
-              <div className={`visitor-speech-bubble-floating animate-beat-in ${currentBeat.safeZone || 'pos-top-left'}`}>
-                <div className="bubble-speaker-header visitor-header">
-                  <div className="visitor-avatar-icon">
-                    <User size={14} />
-                  </div>
-                  <span className="speaker-name-title visitor">{userProfile.visitorName || 'You'}</span>
-                </div>
-                <p className="bubble-sentence-text visitor-text">
-                  "<TypewriterText 
-                    text={
-                      currentBeat.interaction.storeKey === 'visitorName'
-                        ? `My name is ${userProfile.visitorName}.`
-                        : currentBeat.interaction.storeKey === 'visitorAge'
-                          ? `I've been growing for ${userProfile.visitorAge} years.`
-                          : currentBeat.interaction.storeKey === 'visitorLocation'
-                            ? `My story grows in ${userProfile.visitorLocation}. That is where I'm rooted.`
-                            : `You can reach me at my light address: ${userProfile.visitorEmail}.`
-                    } 
-                  />"
-                </p>
-              </div>
-            ) : (
-              <div className="cinematic-input-card animate-beat-in" onClick={(e) => e.stopPropagation()}>
-                <h2 className="card-title">{currentBeat.interaction.title}</h2>
-                {currentBeat.interaction.subtitle && (
-                  <p style={{ color: 'var(--color-text-muted)', fontSize: '0.88rem', marginBottom: '1.2rem' }}>
-                    {currentBeat.interaction.subtitle}
-                  </p>
-                )}
-
-                <form onSubmit={handleInteractionSubmit}>
-                  <input 
-                    type={currentBeat.interaction.type === 'AGE' ? 'number' : currentBeat.interaction.type === 'EMAIL' ? 'email' : 'text'}
-                    className="card-input-field interactive"
-                    placeholder={currentBeat.interaction.placeholder}
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    autoFocus
-                    required
-                  />
-
-                  {validationMsg && (
-                    <div className="card-validation-error">
-                      {validationMsg}
-                    </div>
-                  )}
-
-                  <button type="submit" className="card-submit-btn interactive">
-                    <span>{currentBeat.interaction.buttonText}</span>
-                    <ChevronRight size={18} />
-                  </button>
-                </form>
-              </div>
-            )
-          )}
-
-          {/* LEFT-SIDE PROGRESS BAR & SCROLL DOWN ICON */}
-          <div className="story-bottom-left-progress">
-            <div className="scroll-icon-circle interactive" title="Scroll or click to advance">
-              <ArrowDown size={18} className="bounce-anim" />
-            </div>
-            <div className="progress-mini-bar">
-              <div 
-                className="progress-mini-fill" 
-                style={{ width: `${((beatIndex + 1) / flatBeats.length) * 100}%` }}
-              />
-            </div>
-          </div>
-
-          {/* CHAPTER INDEX DRAWER */}
-          {isChapterDrawerOpen && (
-            <div className="chapter-drawer-overlay" onClick={() => setIsChapterDrawerOpen(false)}>
-              <div className="chapter-drawer-content" onClick={(e) => e.stopPropagation()}>
-                <div className="drawer-header">
-                  <div className="drawer-title">
-                    <BookOpen size={20} className="drawer-title-icon" />
-                    <span>ASTERRA STORY INDEX</span>
-                  </div>
-                  <button 
-                    type="button" 
-                    className="drawer-close-btn interactive"
-                    onClick={() => setIsChapterDrawerOpen(false)}
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-                <div className="drawer-grid">
-                  {STORY_SCENES.map((s) => {
-                    const firstBeatIndex = flatBeats.findIndex((b) => b.sceneId === s.id);
-                    const isActiveChapter = currentBeat.sceneId === s.id;
-                    return (
-                      <div 
-                        key={s.id}
-                        className={`drawer-chapter-card interactive ${isActiveChapter ? 'active' : ''}`}
-                        onClick={() => {
-                          if (firstBeatIndex !== -1) setBeatIndex(firstBeatIndex);
-                          setIsChapterDrawerOpen(false);
-                        }}
-                      >
-                        <div className="drawer-card-thumb-wrap">
-                          <img src={getAdaptiveImageSource(s.image)} alt={s.title} className="drawer-card-thumb" />
-                          {isActiveChapter && <span className="drawer-active-pip" />}
-                        </div>
-                        <div className="drawer-card-meta">
-                          <h4 className="drawer-card-title">{s.title}</h4>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-        </>
-      )}
     </div>
   );
 }
+

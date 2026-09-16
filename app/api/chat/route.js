@@ -1,257 +1,261 @@
 import { NextResponse } from 'next/server';
 
-export async function POST(req) {
-  try {
-    const { message, visitorName, visitorAge, visitorLocation, history, mode = 'casual', isNameSetup = false } = await req.json();
+export const dynamic = 'force-dynamic';
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+const GEMINI_MODEL = 'gemini-3.6-flash';
+const FALLBACK_MODEL = 'gemini-3.7-flash';
 
-    // Handle Name Setup & Validation mode specifically
-    if (isNameSetup) {
-      // Fallback name extraction helper
-      let extracted = message.replace(/my name is|i am|i'm|call me|this is|they call me/gi, '').trim();
-      extracted = extracted.replace(/[^a-zA-Z\s'-]/g, '').trim();
+async function callGemini(apiKey, payload, model = GEMINI_MODEL) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
 
-      const invalidWords = ['idk', 'no', 'why', 'who', 'what', 'hello', 'hi', 'hey', 'nothing', 'skip', 'asdf', 'test', 'user'];
-      const isHeuristicValid = extracted.length >= 2 && !invalidWords.includes(extracted.toLowerCase());
+  if (!res.ok) {
+    if (model !== FALLBACK_MODEL) {
+      return callGemini(apiKey, payload, FALLBACK_MODEL);
+    }
+    const errText = await res.text();
+    throw new Error(`Gemini call failed: ${errText}`);
+  }
+  return res.json();
+}
 
-      let finalExtractedName = isHeuristicValid ? extracted.split(' ')[0] : null;
-      if (finalExtractedName) {
-        finalExtractedName = finalExtractedName.charAt(0).toUpperCase() + finalExtractedName.slice(1).toLowerCase();
-      }
+// THREAD 1: Sprout Conversational Superhero Response Generator
+async function threadSproutDialogue({ apiKey, message, visitorName, visitorAge, visitorLocation, visitorGender, visitorEmail, history, mode }) {
+  const userContext = [];
+  if (visitorName) userContext.push(`Visitor Name: ${visitorName}`);
+  if (visitorAge) userContext.push(`Age: ${visitorAge}`);
+  if (visitorLocation) userContext.push(`Location/Home: ${visitorLocation}`);
+  if (visitorGender) userContext.push(`Gender: ${visitorGender}`);
+  if (visitorEmail) userContext.push(`Email: ${visitorEmail}`);
 
-      if (!apiKey) {
-        if (finalExtractedName) {
-          return NextResponse.json({
-            isNameSetup: true,
-            isValidName: true,
-            extractedName: finalExtractedName,
-            reply: `It's so wonderful to meet you, ${finalExtractedName}! I'm Sprout, your Growth Guardian superhero. How can I help or support you today?`
-          });
-        } else {
-          return NextResponse.json({
-            isNameSetup: true,
-            isValidName: false,
-            reply: `I want to make sure I greet you properly! What is your name?`
-          });
-        }
-      }
+  let modeGuidance = mode === 'help'
+    ? 'MODE: NEEDS HELP. Offer deep superhero reassurance, gentle grounding, and one small courageous step forward.'
+    : 'MODE: CASUAL TALK. Be joyful, brave, fast-paced, and highly varied in your responses. Do not repeat standard greetings.';
 
-      // If Gemini API is available, ask Gemini to validate and extract cleanly without inventing anything
-      const nameValidationPrompt = `You are Sprout, a superhero chatbot. A user was asked "What is your name?".
-User input: "${message}"
+  const systemPrompt = `You are Sprout, a brave, warm-hearted, and empathetic superhero Growth Guardian from the magical world of Asterra.
+${modeGuidance}
 
-CRITICAL RULE: Extract the EXACT human name provided by the user. Do NOT invent, guess, or make up any name. If the user did NOT provide their name in the input, set "isValidName": false.
+Known Visitor Details: ${userContext.length > 0 ? userContext.join(', ') : 'None yet'}
 
-Respond in exact JSON format:
-{
-  "isValidName": boolean,
-  "extractedName": "ExactUserGivenName" or null,
-  "reply": "Warm greeting acknowledging their exact name if valid, or polite request asking for their real name if not valid. Do NOT use emojis."
-}`;
+Instructions:
+1. Respond warmly and conversationally to what the visitor just said.
+2. Be SMART, BRAVE, and highly DYNAMIC. Never repeat the exact same phrasing. Use rich, varied vocabulary that fits a simple, friendly superhero character.
+3. If the visitor introduced themselves, greet them warmly by name.
+4. Keep your reply fast-paced and concise (1 to 3 sentences maximum).
+5. Do not use emoji symbols or markdown asterisks everywhere. Speak with genuine superhero heart.`;
 
-      try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-        const res = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: nameValidationPrompt }] }],
-            generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
-          })
-        });
+  const contents = [];
+  
+  if (Array.isArray(history) && history.length > 0) {
+    const validHistory = history
+      .filter((h) => h && h.text && h.text.trim())
+      .slice(-6);
 
-        if (res.ok) {
-          const data = await res.json();
-          const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (jsonText) {
-            const parsed = JSON.parse(jsonText);
-            if (parsed.isValidName && parsed.extractedName) {
-              const cleaned = parsed.extractedName.charAt(0).toUpperCase() + parsed.extractedName.slice(1);
-              return NextResponse.json({
-                isNameSetup: true,
-                isValidName: true,
-                extractedName: cleaned,
-                reply: parsed.reply || `It's so wonderful to meet you, ${cleaned}! How can I support you today?`
-              });
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Gemini name validation fallback:', err);
-      }
-
-      if (finalExtractedName) {
-        return NextResponse.json({
-          isNameSetup: true,
-          isValidName: true,
-          extractedName: finalExtractedName,
-          reply: `It's so wonderful to meet you, ${finalExtractedName}! I'm Sprout, your Growth Guardian superhero. How can I help or support you today?`
-        });
+    for (const h of validHistory) {
+      const role = h.sender === 'user' ? 'user' : 'model';
+      if (contents.length > 0 && contents[contents.length - 1].role === role) {
+        // Merge with previous message to guarantee alternation
+        contents[contents.length - 1].parts[0].text += `\n${h.text.trim()}`;
       } else {
-        return NextResponse.json({
-          isNameSetup: true,
-          isValidName: false,
-          reply: `I want to make sure I greet you properly! What is your name?`
+        contents.push({
+          role,
+          parts: [{ text: h.text.trim() }]
         });
       }
     }
+  }
 
-    // Automatic Profile Field Extraction from Message
-    let extractedAge = null;
-    const ageRegex = /(?:i am|i'm|my age is|age is|age)\s*([0-9]{1,2})\b|\b([0-9]{1,2})\s*(?:years old|yrs old|years)\b/i;
-    const ageMatch = message.match(ageRegex);
-    if (ageMatch) {
-      const rawVal = parseInt(ageMatch[1] || ageMatch[2], 10);
-      if (rawVal >= 5 && rawVal <= 120) {
-        extractedAge = rawVal.toString();
-      }
-    }
-
-    let extractedLocation = null;
-    const locRegex = /(?:i live in|i am from|my home is in|located in|from)\s+([A-Za-z\s,]{2,30})/i;
-    const locMatch = message.match(locRegex);
-    if (locMatch && locMatch[1]) {
-      extractedLocation = locMatch[1].trim();
-    }
-
-    let extractedEmail = null;
-    const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
-    const emailMatch = message.match(emailRegex);
-    if (emailMatch) {
-      extractedEmail = emailMatch[0];
-    }
-
-    // Normal Conversation Prompts based on Mode
-    const activeAge = visitorAge || extractedAge;
-    const userContext = [];
-    if (visitorName) userContext.push(`Visitor Name: ${visitorName}`);
-    if (activeAge) userContext.push(`Age: ${activeAge}`);
-    if (visitorLocation || extractedLocation) userContext.push(`Location: ${visitorLocation || extractedLocation}`);
-
-    let modeDescription = "";
-    if (mode === 'help') {
-      modeDescription = `MODE: ACTION HELP & GUIDANCE. Focus on clear, empowered, step-by-step superhero solutions, actionable advice, practical guidance, and strong superhero support to solve their problem.`;
-    } else {
-      modeDescription = `MODE: CASUAL TALK. Focus on lighthearted, friendly superhero conversation, chatting about Asterra city lore, daily life, hobbies, and superhero companionship.`;
-    }
-
-    const systemPrompt = `You are Sprout, an empathetic, caring superhero Growth Guardian from the magical city of Asterra.
-Your mission is to help visitors grow, navigate personal struggles, feel truly heard, and find hope.
-${modeDescription}
-
-Visitor Context: ${userContext.length > 0 ? userContext.join(', ') : 'No name/profile provided yet'}
-
-CRITICAL MEMORY & GLOBAL STATE RULES:
-1. Speak directly to the visitor in a personal, authentic superhero tone with memory continuity.
-2. Address the visitor by Visitor Name ONLY if explicitly provided in Visitor Context. NEVER invent, guess, or make up any name.
-3. DO NOT ask the user for their Age, Name, Location, or Email if it is ALREADY PROVIDED in Visitor Context! Use known details naturally and conversationally (e.g. "Since you are ${activeAge || 'growing'}...").
-4. Adapt your tone strictly to the selected mode (${mode.toUpperCase()}).
-5. Keep your response concise (2-4 sentences max), clear, and easy to read.
-6. Do NOT include emoji symbols in your text output.
-7. If the visitor is expressing a worry or issue, summarize their core concern in 1 short line under "ANALYZED_ISSUE: [short summary]".`;
-
-    if (!apiKey) {
-      const nameClause = visitorName ? `, ${visitorName}` : '';
-      let fallbackReply = `I hear you deeply${nameClause}. Every seed goes through dark soil before reaching the sunlight. You don't have to carry the whole world today.`;
-
-      if (mode === 'casual') {
-        fallbackReply = `That's wonderful to talk about${nameClause}! In Asterra, we always share stories like this under the great heartwood tree.`;
-      } else if (mode === 'help') {
-        fallbackReply = `Here is what we can do together${nameClause}: First, take one deep breath. Second, focus on one small action you can take right now. I'm right here with you!`;
-      }
-
-      return NextResponse.json({
-        reply: fallbackReply,
-        analyzedIssue: "Visitor seeking guidance & listening care.",
-        extractedAge,
-        extractedLocation,
-        extractedEmail
-      });
-    }
-
-    const contents = [];
-
-    if (Array.isArray(history) && history.length > 0) {
-      history.slice(-8).forEach((msg) => {
-        if (msg.text) {
-          contents.push({
-            role: msg.sender === 'user' ? 'user' : 'model',
-            parts: [{ text: msg.text }]
-          });
-        }
-      });
-    }
-
+  // Ensure last message is 'user'
+  const userPromptText = `${systemPrompt}\n\nVisitor Message: "${message}"`;
+  if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
+    contents[contents.length - 1].parts[0].text += `\n\n${userPromptText}`;
+  } else {
     contents.push({
       role: 'user',
-      parts: [{ text: `${systemPrompt}\n\nVisitor Message: "${message}"` }]
+      parts: [{ text: userPromptText }]
+    });
+  }
+
+  const data = await callGemini(apiKey, {
+    contents,
+    generationConfig: {
+      temperature: mode === 'help' ? 0.7 : 0.9,
+      maxOutputTokens: 800
+    }
+  });
+
+  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return { reply: rawText.trim(), analyzedIssue: null };
+}
+
+// THREAD 2: Parallel Entity & Profile Extraction Engine
+async function threadEntityExtraction({ apiKey, message }) {
+  // Heuristic Regex Fast-Pass
+  let regexAge = null;
+  const ageMatch = message.match(/(?:i am|i'm|my age is|age is|age)\s*([0-9]{1,2})\b|\b([0-9]{1,2})\s*(?:years old|yrs old|years)\b/i);
+  if (ageMatch) {
+    const val = parseInt(ageMatch[1] || ageMatch[2], 10);
+    if (val >= 4 && val <= 120) regexAge = val.toString();
+  }
+
+  let regexEmail = null;
+  const emailMatch = message.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
+  if (emailMatch) regexEmail = emailMatch[0];
+
+  let regexLocation = null;
+  const locMatch = message.match(/(?:i live in|i am from|from|living in|located in|my city is|my country is|my home is in)\s+([A-Za-z\s,]{2,30})/i);
+  if (locMatch && locMatch[1]) {
+    let candidate = locMatch[1].split(/[\n.,;]|\band\b|\bemail\b|\byou can\b/i)[0].trim();
+    if (candidate.length > 1) regexLocation = candidate;
+  }
+
+  let regexGender = null;
+  const genderMatch = message.match(/\b(male|female|non-binary|boy|girl|man|woman|gentleman|lady)\b/i);
+  if (genderMatch) {
+    const g = genderMatch[1].toLowerCase();
+    if (g === 'boy' || g === 'man' || g === 'gentleman') regexGender = 'Male';
+    else if (g === 'girl' || g === 'woman' || g === 'lady') regexGender = 'Female';
+    else regexGender = g.charAt(0).toUpperCase() + g.slice(1);
+  }
+
+  // LLM Structured JSON Extraction
+  const extractionPrompt = `Extract user profile details from this message if explicitly stated by the user. Do NOT invent details.
+Message: "${message}"
+
+Respond strictly in JSON:
+{
+  "name": "User's real personal name if stated, or null",
+  "age": "User's age in digits as string if stated, or null",
+  "location": "City/country/location if stated, or null",
+  "gender": "Gender (Male, Female, Non-binary) if stated, or null",
+  "email": "Email address if stated, or null"
+}`;
+
+  try {
+    const data = await callGemini(apiKey, {
+      contents: [{ role: 'user', parts: [{ text: extractionPrompt }] }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 600,
+        responseMimeType: 'application/json'
+      }
     });
 
-    const models = ['gemini-1.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.6-flash'];
-    let aiRawText = null;
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (text) {
+      const parsed = JSON.parse(text);
+      return {
+        extractedName: parsed.name && parsed.name.toLowerCase() !== 'null' ? parsed.name.trim() : null,
+        extractedAge: (parsed.age && parsed.age.toLowerCase() !== 'null' ? parsed.age.toString().trim() : regexAge),
+        extractedLocation: parsed.location && parsed.location.toLowerCase() !== 'null' ? parsed.location.trim() : regexLocation,
+        extractedGender: parsed.gender && parsed.gender.toLowerCase() !== 'null' ? parsed.gender.trim() : regexGender,
+        extractedEmail: parsed.email && parsed.email.toLowerCase() !== 'null' ? parsed.email.trim() : regexEmail
+      };
+    }
+  } catch (err) {
+    console.warn('Entity extraction fallback to heuristics:', err.message);
+  }
 
-    for (const model of models) {
-      try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const response = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents,
-            generationConfig: {
-              temperature: mode === 'help' ? 0.4 : 0.8,
-              maxOutputTokens: 1000,
-            }
-          })
-        });
+  // Heuristic Name Fallback
+  let fallbackName = null;
+  const nameMatch = message.match(/(?:my name is|i am|i'm called|call me|name's)\s+([A-Z][a-z]+|[a-z]+)/i);
+  if (nameMatch && nameMatch[1]) {
+    const raw = nameMatch[1].trim();
+    const banned = ['happy', 'sad', 'tired', 'here', 'ready', 'fine', 'good', 'sprout', 'robot', 'user'];
+    if (!banned.includes(raw.toLowerCase()) && raw.length >= 2) {
+      fallbackName = raw.charAt(0).toUpperCase() + raw.slice(1);
+    }
+  }
 
-        if (response.ok) {
-          const data = await response.json();
-          aiRawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (aiRawText) break;
-        } else {
-          const errText = await response.text();
-          console.warn(`Gemini model ${model} failed:`, errText);
-        }
-      } catch (e) {
-        console.warn(`Error connecting to Gemini model ${model}:`, e);
-      }
+  return {
+    extractedName: fallbackName,
+    extractedAge: regexAge,
+    extractedLocation: regexLocation,
+    extractedGender: regexGender,
+    extractedEmail: regexEmail
+  };
+}
+
+export async function POST(req) {
+  try {
+    const { message, history = [], mode = 'casual', visitorName, visitorAge, visitorLocation, visitorGender, visitorEmail } = await req.json();
+
+    // API Key Rotation Logic
+    const availableKeys = [
+      process.env.GEMINI_API_KEY,
+      process.env.GEMINI_API_KEY_2
+    ].filter(Boolean); // Only keep keys that are actually defined in .env
+
+    if (availableKeys.length === 0) {
+      console.error('No Gemini API keys found in environment variables.');
+      return NextResponse.json(
+        { error: 'Server configuration error.' },
+        { status: 500 }
+      );
     }
 
-    if (aiRawText) {
-      let replyText = aiRawText;
-      let analyzedIssue = null;
+    // Pick a random key for this request to distribute the load
+    const apiKey = availableKeys[Math.floor(Math.random() * availableKeys.length)];
 
-      if (aiRawText.includes('ANALYZED_ISSUE:')) {
-        const parts = aiRawText.split('ANALYZED_ISSUE:');
-        replyText = parts[0].trim();
-        analyzedIssue = parts[1]?.trim();
-      }
+    if (!message || !message.trim()) {
+      return NextResponse.json({ reply: "I'm right here listening. What's on your mind today, friend?" });
+    }
 
+    if (!apiKey) {
       return NextResponse.json({
-        reply: replyText,
-        analyzedIssue: analyzedIssue || "Personal concern shared by visitor.",
-        extractedAge,
-        extractedLocation,
-        extractedEmail
-      });
-    } else {
-      const nameClause = visitorName ? `, ${visitorName}` : '';
-      return NextResponse.json({
-        reply: `I'm right here with you${nameClause}. Whatever you're facing, you have the strength to grow through it.`,
-        analyzedIssue: "Visitor seeking personal support and superhero guidance.",
-        extractedAge,
-        extractedLocation,
-        extractedEmail
+        reply: `I hear you deeply, ${visitorName || 'my friend'}. Small steps create mighty forests. I am right beside you.`,
+        analyzedIssue: "General superhero support"
       });
     }
+
+    // MULTI-THREAD PARALLEL EXECUTION VIA PROMISE.ALL
+    const [dialogueResult, extractionResult] = await Promise.all([
+      threadSproutDialogue({
+        apiKey,
+        message,
+        visitorName,
+        visitorAge,
+        visitorLocation,
+        visitorGender,
+        visitorEmail,
+        history,
+        mode
+      }).catch((err) => {
+        console.error('Thread 1 error:', err);
+        return {
+          reply: `I'm standing right beside you, ${visitorName || 'friend'}. Even the tallest oak started as a small seed that never gave up. What shall we protect next?`,
+          analyzedIssue: null
+        };
+      }),
+
+      threadEntityExtraction({
+        apiKey,
+        message
+      }).catch((err) => {
+        console.error('Thread 2 error:', err);
+        return {};
+      })
+    ]);
+
+    return NextResponse.json({
+      reply: dialogueResult.reply,
+      analyzedIssue: dialogueResult.analyzedIssue || (mode === 'help' ? 'Guidance and support request' : 'Conversation with Sprout'),
+      extractedName: extractionResult.extractedName || null,
+      extractedAge: extractionResult.extractedAge || null,
+      extractedLocation: extractionResult.extractedLocation || null,
+      extractedGender: extractionResult.extractedGender || null,
+      extractedEmail: extractionResult.extractedEmail || null
+    });
 
   } catch (error) {
-    console.error('Error in /api/chat Gemini endpoint:', error);
+    console.error('Error in multi-threaded /api/chat handler:', error);
     return NextResponse.json({
-      reply: "Take a gentle breath. I'm right here listening with care.",
-      analyzedIssue: "General inquiry"
+      reply: "Take a deep breath with me. I'm right here with you, always.",
+      analyzedIssue: "Connection notice"
     });
   }
 }

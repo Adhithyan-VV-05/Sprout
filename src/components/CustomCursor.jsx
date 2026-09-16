@@ -8,6 +8,7 @@ export default function CustomCursor() {
   const [isHovered, setIsHovered] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [cursorType, setCursorType] = useState('default'); // 'journey', 'watch', 'help', 'casual', 'chip', 'input', 'avatar', 'default'
 
   const posRef = useRef({ x: -100, y: -100 });
   const ringPosRef = useRef({ x: -100, y: -100 });
@@ -32,17 +33,39 @@ export default function CustomCursor() {
 
     const handleMouseOver = (e) => {
       const target = e.target;
-      if (
+      
+      if (target.closest('.hero-btn-primary-journey') || target.closest('.btn-lime-pill')) {
+        setIsHovered(true);
+        setCursorType('journey');
+      } else if (target.closest('.hero-btn-secondary-watch') || target.closest('.play-icon-bubble')) {
+        setIsHovered(true);
+        setCursorType('watch');
+      } else if (target.closest('.mode-btn-help') || target.closest('.chat-mode-help-active')) {
+        setIsHovered(true);
+        setCursorType('help');
+      } else if (target.closest('.mode-btn-casual') || target.closest('.chat-mode-casual-active')) {
+        setIsHovered(true);
+        setCursorType('casual');
+      } else if (target.closest('.sprout-chip-btn') || target.closest('.ask-sprout-chip-item')) {
+        setIsHovered(true);
+        setCursorType('chip');
+      } else if (target.closest('input') || target.closest('textarea')) {
+        setIsHovered(true);
+        setCursorType('input');
+      } else if (target.closest('.sprout-avatar-badge') || target.closest('.sprout-header-avatar') || target.closest('.brand-leaf-logo-icon')) {
+        setIsHovered(true);
+        setCursorType('avatar');
+      } else if (
         target.closest('button') ||
         target.closest('a') ||
-        target.closest('input') ||
         target.closest('.interactive') ||
-        target.closest('.awwwards-chapter-hud') ||
-        target.closest('.ref-btn-primary-explore')
+        target.closest('.feature-badge-item')
       ) {
         setIsHovered(true);
+        setCursorType('default-hover');
       } else {
         setIsHovered(false);
+        setCursorType('default');
       }
     };
 
@@ -84,11 +107,11 @@ export default function CustomCursor() {
     <>
       <div 
         ref={dotRef} 
-        className={`awwwards-cursor-dot ${isClicked ? 'clicked' : ''} ${isHovered ? 'hovered' : ''}`} 
+        className={`awwwards-cursor-dot ${isClicked ? 'clicked' : ''} ${isHovered ? 'hovered' : ''} cursor-${cursorType}`} 
       />
       <div 
         ref={ringRef} 
-        className={`awwwards-cursor-ring ${isClicked ? 'clicked' : ''} ${isHovered ? 'hovered' : ''}`} 
+        className={`awwwards-cursor-ring ${isClicked ? 'clicked' : ''} ${isHovered ? 'hovered' : ''} cursor-${cursorType}`} 
       />
     </>
   );

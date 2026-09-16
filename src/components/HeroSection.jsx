@@ -1,60 +1,55 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, ArrowRight, Sparkles, User, HeartHandshake, CheckCheck, SendHorizontal, ShieldAlert, MessageCircle, Heart, Zap, X } from 'lucide-react';
+import { 
+  Send, 
+  ArrowRight, 
+  Sparkles, 
+  User, 
+  HeartHandshake, 
+  CheckCheck, 
+  SendHorizontal, 
+  ShieldAlert, 
+  Shield,
+  MessageCircle, 
+  Heart, 
+  Zap, 
+  X, 
+  Minus,
+  Maximize2,
+  Play, 
+  Moon, 
+  Sun, 
+  Users, 
+  Globe,
+  Leaf
+} from 'lucide-react';
 import ParticleCanvas from './ParticleCanvas';
-import { getAdaptiveImageSource, getBlurPlaceholder, isMobileViewport } from '../services/imageOptimizer';
+import { layoutConfig } from '../config/layoutConfig';
 
-export default function HeroSection({ isStoryActive, onStartStory, userProfile, updateUserProfile }) {
+export default function HeroSection({ isStoryActive, onStartStory, userProfile, updateUserProfile, postStoryTrigger }) {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-
-  // Chat Modes: 'casual' | 'help'
-  const [chatMode, setChatMode] = useState('casual');
+  const [chatMode, setChatMode] = useState('casual'); // 'casual' | 'help'
   const [isNameConfirmed, setIsNameConfirmed] = useState(Boolean(userProfile?.visitorName));
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [isClosed, setIsClosed] = useState(false);
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth <= 768);
 
-  // Sync extracted profile fields from API
-  const handleExtractedProfile = (data) => {
-    if (!data || !updateUserProfile) return;
-    if (data.extractedAge && !userProfile.visitorAge) {
-      updateUserProfile('visitorAge', data.extractedAge);
-    }
-    if (data.extractedLocation && !userProfile.visitorLocation) {
-      updateUserProfile('visitorLocation', data.extractedLocation);
-    }
-    if (data.extractedEmail && !userProfile.visitorEmail) {
-      updateUserProfile('visitorEmail', data.extractedEmail);
-    }
-    // Extract name if not yet stored
-    if (data.extractedName && !userProfile.visitorName) {
-      updateUserProfile('visitorName', data.extractedName);
-      setIsNameConfirmed(true);
-    }
-  };
-
-  // Chat Messages State with WhatsApp Timestamps & History
   const [messages, setMessages] = useState([]);
   const [latestAnalyzedIssue, setLatestAnalyzedIssue] = useState('');
-  const [visitorProblem, setVisitorProblem] = useState('');
-  const [showConfirmationBtn, setShowConfirmationBtn] = useState(false);
-  const [isSignalDispatched, setIsSignalDispatched] = useState(false);
-  const [isDispatchingSignal, setIsDispatchingSignal] = useState(false);
-  const [isEmergencyActive, setIsEmergencyActive] = useState(false);
-
   const chatBodyRef = useRef(null);
-
-  // Hero Image Adaptive Loader
-  const [heroImageSrc, setHeroImageSrc] = useState('');
-  const [heroBlurSrc, setHeroBlurSrc] = useState('');
-  const [isHeroLoaded, setIsHeroLoaded] = useState(false);
+  
+  // Needs Help form state
+  const [formGrievance, setFormGrievance] = useState('');
+  const [isSendingSignal, setIsSendingSignal] = useState(false);
+  const [signalSent, setSignalSent] = useState(false);
 
   const getTimeString = () => {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Track viewport size changes for mobile/desktop image swapping
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth <= 768);
@@ -63,569 +58,541 @@ export default function HeroSection({ isStoryActive, onStartStory, userProfile, 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Load hero background image — re-runs when mobile state changes
+  // Initial greeting matching Image 2
   useEffect(() => {
-    const baseHero = '/story/hero bg pc.webp';
-    const adaptiveSrc = getAdaptiveImageSource(baseHero);
-    const blurSrc = getBlurPlaceholder(baseHero);
-
-    setHeroBlurSrc(blurSrc);
-    setIsHeroLoaded(false);
-
-    const img = new Image();
-    img.src = adaptiveSrc;
-    img.onload = () => {
-      setHeroImageSrc(adaptiveSrc);
-      setIsHeroLoaded(true);
-    };
-    img.onerror = () => {
-      setHeroImageSrc(adaptiveSrc);
-    };
-  }, [isMobile]);
-
-  // Sync name from Story Mode or User Profile state
-  useEffect(() => {
-    if (userProfile?.visitorName) {
-      setIsNameConfirmed(true);
-    }
-  }, [userProfile?.visitorName]);
-
-  // Initialize Chat Greeting - Runs ONCE on mount to avoid overwriting 1st sent message!
-  useEffect(() => {
-    const initialName = userProfile.visitorName;
-    const initialText = initialName 
-      ? `Welcome back, ${initialName}! I'm listening with full care. How can I help you today?`
-      : "Hey there! I'm Sprout, your Growth Guardian superhero! 🌿 May I know your name so I know who I'm protecting and talking with today?";
+    const initialName = userProfile?.visitorName;
+    const namedGreetings = [
+      `Hey there ${initialName}! I'm Sprout, your Growth Guardian superhero! 🌿 How may I protect and brighten your world today?`,
+      `Welcome back, ${initialName}! I'm ready to stand beside you. 🌿 What are we tackling today?`,
+      `Hello ${initialName}! 🌿 Your Growth Guardian is here. Let's make today a little brighter!`,
+    ];
+    const anonymousGreetings = [
+      "Hey there! I'm Sprout, your Growth Guardian superhero! 🌿 May I know your name so I know who I'm protecting and talking with today?",
+      "Hello friend! 🌿 I'm Sprout. Before we begin our journey, what should I call you?",
+      "Welcome! I am Sprout, your superhero guide. 🌿 What name do your loved ones call you?",
+    ];
+    
+    const greetingsArray = initialName ? namedGreetings : anonymousGreetings;
+    const randomGreeting = greetingsArray[Math.floor(Math.random() * greetingsArray.length)];
 
     setMessages([
-      { id: 1, sender: 'sprout', text: initialText, time: getTimeString() }
+      { id: 1, sender: 'sprout', text: randomGreeting, time: getTimeString() }
     ]);
-  }, []);
+  }, [userProfile?.visitorName]);
 
+  // Post-Story Automatic Typing Animation & Sprout Question
+  useEffect(() => {
+    if (!postStoryTrigger) return;
+    setIsClosed(false);
+    setIsMinimized(false);
+    setIsTyping(true);
 
-  // Auto-scroll chat body
+    const timer = setTimeout(() => {
+      setIsTyping(false);
+      const namePart = userProfile?.visitorName ? ` ${userProfile.visitorName}` : '';
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          sender: 'sprout',
+          text: `How was my story${namePart}? 🌿 Remember, not all superheroes come with physical strength—some heal the world with kindness, empathy, and listening hearts. How are you feeling right now?`,
+          time: getTimeString()
+        }
+      ]);
+    }, 1400);
+
+    return () => clearTimeout(timer);
+  }, [postStoryTrigger, userProfile?.visitorName]);
+
   useEffect(() => {
     if (chatBodyRef.current) {
       chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
     }
-  }, [messages, isTyping, isDispatchingSignal, showConfirmationBtn]);
+  }, [messages, isTyping]);
 
-  const handleModeChange = (e, newMode) => {
-    if (e && e.preventDefault) {
-      e.preventDefault();
+  // Profile extraction helper
+  const handleExtractedProfile = (data) => {
+    if (!data || !updateUserProfile) return;
+    if (data.extractedAge && !userProfile?.visitorAge) {
+      updateUserProfile('visitorAge', data.extractedAge);
     }
+    if (data.extractedLocation && !userProfile?.visitorLocation) {
+      updateUserProfile('visitorLocation', data.extractedLocation);
+    }
+    if (data.extractedEmail && !userProfile?.visitorEmail) {
+      updateUserProfile('visitorEmail', data.extractedEmail);
+    }
+    if (data.extractedGender && !userProfile?.visitorGender) {
+      updateUserProfile('visitorGender', data.extractedGender);
+    }
+    if (data.extractedName && !userProfile?.visitorName) {
+      updateUserProfile('visitorName', data.extractedName);
+      setIsNameConfirmed(true);
+    }
+  };
 
+  // Switch chat mode between 'casual' and 'help'
+  const handleModeChange = (e, newMode) => {
+    if (e && e.preventDefault) e.preventDefault();
     if (newMode === chatMode) return;
     setChatMode(newMode);
-    setShowConfirmationBtn(false);
-
+    
     if (newMode === 'help') {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          sender: 'sprout',
-          isModeTag: true,
-          text: `Switched mode to ⚡ Needs Help.`,
-          time: getTimeString()
-        },
-        {
-          id: Date.now() + 1,
-          sender: 'sprout',
-          isRedGrievance: true,
-          text: "🚨 WHAT IS THE ISSUE? Please tell me what happened or what is troubling you, so I can understand your grievance and protect you.",
-          time: getTimeString()
-        }
-      ]);
+      setSignalSent(false); // Reset form state
     } else {
+      const modeNotice = "Switched to 💬 Casual Talk mode. Let's chat about Asterra, dreams, and joyful thoughts!";
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now(),
           sender: 'sprout',
           isModeTag: true,
-          text: `Switched mode to 💬 Casual Talk.`,
+          text: modeNotice,
           time: getTimeString()
         }
       ]);
     }
-  };
-
-  const [collectingField, setCollectingField] = useState(null);
-
-  const getMissingProfileField = (profile) => {
-    if (!profile?.visitorName) {
-      return {
-        field: 'visitorName',
-        question: "To call upon Sprout superhero, what is your true name, my friend?"
-      };
-    }
-    if (!profile?.visitorAge) {
-      return {
-        field: 'visitorAge',
-        question: `How many winters have your roots seen in this realm, ${profile.visitorName}? (What is your age?)`
-      };
-    }
-    if (!profile?.visitorLocation) {
-      return {
-        field: 'visitorLocation',
-        question: `Where on Earth are your roots grounded right now, ${profile.visitorName}? (Your city or country so Sprout can navigate to you)`
-      };
-    }
-    if (!profile?.visitorEmail) {
-      return {
-        field: 'visitorEmail',
-        question: `What light address (email) should Sprout send word to so you receive confirmation that help is on the way?`
-      };
-    }
-    return null;
-  };
-
-  const dispatchSuperheroSignal = async (profileData) => {
-    setIsDispatchingSignal(true);
-    setShowConfirmationBtn(false);
-    try {
-      const res = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          visitorName: profileData.visitorName,
-          visitorEmail: profileData.visitorEmail,
-          visitorAge: profileData.visitorAge,
-          visitorLocation: profileData.visitorLocation,
-          analyzedIssue: visitorProblem || latestAnalyzedIssue || 'Superhero grievance signal dispatched',
-          fullTranscript: messages,
-          type: 'SUPERHERO_DISTRESS_SIGNAL'
-        })
-      });
-
-      await res.json();
-      setIsDispatchingSignal(false);
-      setIsSignalDispatched(true);
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 2,
-          sender: 'sprout',
-          isSpecial: true,
-          text: `🚨 SUPERHERO SIGNAL ACTIVATED & DISPATCHED! Your grievance regarding "${visitorProblem || 'your issue'}" has been transmitted directly to Hero inbox (adhithyanvv4u@gmail.com) and a hope message sent to your email (${profileData.visitorEmail}). Sprout superhero is coming to ${profileData.visitorLocation || 'your location'}!`,
-          time: getTimeString()
-        }
-      ]);
-    } catch (err) {
-      console.error('Error dispatching superhero signal:', err);
-      setIsDispatchingSignal(false);
-    }
-  };
-
-  const handleDispatchSignalClick = () => {
-    // Check if visitor has described their problem yet
-    if (!visitorProblem || !visitorProblem.trim()) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          sender: 'sprout',
-          isRedGrievance: true,
-          text: "Before I dispatch the signal to the Growth Guardians, please tell me what happened! What is your problem?",
-          time: getTimeString()
-        }
-      ]);
-      return;
-    }
-
-    // Visitor has told what the problem is -> Ask for confirmation to send issue content
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        sender: 'sprout',
-        isConfirmationReq: true,
-        text: `I have recorded your grievance: "${visitorProblem}". Are you ready to dispatch this signal with the content of your issue to Sprout?`,
-        time: getTimeString()
-      }
-    ]);
-    setShowConfirmationBtn(true);
-  };
-
-  const handleConfirmSignalSend = () => {
-    const missing = getMissingProfileField(userProfile);
-    if (missing) {
-      setCollectingField(missing.field);
-      setMessages((prev) => [
-        ...prev,
-        { id: Date.now() + 1, sender: 'sprout', text: missing.question, time: getTimeString() }
-      ]);
-      return;
-    }
-
-    dispatchSuperheroSignal(userProfile);
   };
 
   const handlePromptClick = (e, promptText) => {
-    if (e && e.preventDefault) {
-      e.preventDefault();
-    }
-    processInput(promptText, true);
+    if (e && e.preventDefault) e.preventDefault();
+    sendMessage(promptText);
   };
 
-  const processInput = async (text, overrideIsPrompt = false) => {
-    if (!text || !text.trim()) return;
-    const currentInput = text.trim();
-    setInputText('');
+  const sendMessage = async (textToSend) => {
+    const query = textToSend || inputText;
+    if (!query.trim()) return;
 
-    const time = getTimeString();
+    const userMsg = {
+      id: Date.now(),
+      sender: 'user',
+      text: query,
+      time: getTimeString()
+    };
 
-    // Add User Message
-    const userMsg = { id: Date.now(), sender: 'user', text: currentInput, time };
     setMessages((prev) => [...prev, userMsg]);
+    if (!textToSend) setInputText('');
     setIsTyping(true);
 
-    // Record problem if in Help mode or answering grievance prompt
-    if (chatMode === 'help' || !visitorProblem) {
-      setVisitorProblem(currentInput);
-    }
+    const currentName = userProfile?.visitorName;
+    const isFirstTimeNaming = !currentName;
 
-    // Check if user is typing their age explicitly (e.g. "I am 18", "18", "My age is 21")
-    const ageMatch = currentInput.match(/(?:i am|i'm|my age is|age is|age)\s*([0-9]{1,2})\b|\b([0-9]{1,2})\s*(?:years old|yrs old|years)\b/i);
-    if (ageMatch && updateUserProfile) {
-      const parsedAge = ageMatch[1] || ageMatch[2];
-      if (parsedAge && parseInt(parsedAge, 10) >= 5 && parseInt(parsedAge, 10) <= 120) {
-        updateUserProfile('visitorAge', parsedAge);
-      }
-    }
 
-    // If currently collecting missing profile fields step-by-step
-    if (collectingField) {
-      let val = currentInput;
-      if (collectingField === 'visitorName') {
-        val = currentInput.replace(/my name is|i am|i'm|call me/gi, '').trim();
-        if (!val) val = currentInput;
-        val = val.charAt(0).toUpperCase() + val.slice(1);
-        setIsNameConfirmed(true);
-      }
 
-      if (updateUserProfile) {
-        updateUserProfile(collectingField, val);
-      }
-
-      const updatedProfile = { ...userProfile, [collectingField]: val };
-      const nextMissing = getMissingProfileField(updatedProfile);
-
-      setIsTyping(false);
-
-      if (nextMissing) {
-        setCollectingField(nextMissing.field);
-        setMessages((prev) => [
-          ...prev,
-          { id: Date.now() + 1, sender: 'sprout', text: nextMissing.question, time: getTimeString() }
-        ]);
-      } else {
-        setCollectingField(null);
-        setMessages((prev) => [
-          ...prev,
-          { id: Date.now() + 1, sender: 'sprout', text: `Thank you, ${updatedProfile.visitorName}! All your details are verified. Transmitting superhero distress signal now...`, time: getTimeString() }
-        ]);
-        dispatchSuperheroSignal(updatedProfile);
-      }
-      return;
-    }
-
-    // Normal conversation response via API
     try {
-      const res = await fetch('/api/chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: currentInput,
-          visitorName: userProfile.visitorName || '',
-          visitorAge: userProfile.visitorAge || '',
-          visitorLocation: userProfile.visitorLocation || '',
+          message: query,
+          visitorName: userProfile?.visitorName,
+          visitorAge: userProfile?.visitorAge,
+          visitorLocation: userProfile?.visitorLocation,
+          visitorGender: userProfile?.visitorGender,
+          visitorEmail: userProfile?.visitorEmail,
           mode: chatMode,
-          history: messages
+          isNameSetup: isFirstTimeNaming,
+          history: [...messages, userMsg].map((m) => ({
+            sender: m.sender,
+            text: m.text
+          }))
         })
       });
 
-      const data = await res.json();
+      const data = await response.json();
       setIsTyping(false);
-      handleExtractedProfile(data);
 
       if (data && data.reply) {
+        if (data.extractedName && updateUserProfile && !userProfile?.visitorName) {
+          updateUserProfile('visitorName', data.extractedName);
+          setIsNameConfirmed(true);
+        }
+
         if (data.analyzedIssue) {
           setLatestAnalyzedIssue(data.analyzedIssue);
         }
 
+        handleExtractedProfile(data);
+
         setMessages((prev) => [
           ...prev,
-          { id: Date.now() + 1, sender: 'sprout', text: data.reply, time: getTimeString() }
-        ]);
-      } else {
-        const nameClause = userProfile.visitorName ? `, ${userProfile.visitorName}` : '';
-        setMessages((prev) => [
-          ...prev,
-          { 
-            id: Date.now() + 1, 
-            sender: 'sprout', 
-            text: `I hear you deeply${nameClause}. Every small leaf grows towards the light.`, 
-            time: getTimeString() 
+          {
+            id: Date.now() + 1,
+            sender: 'sprout',
+            text: data.reply,
+            time: getTimeString()
           }
         ]);
       }
     } catch (err) {
-      console.warn('Gemini API call error:', err);
       setIsTyping(false);
-      const nameClause = userProfile.visitorName ? `, ${userProfile.visitorName}` : '';
+      // Fallback empathetic response
+      let fallbackText = "I'm right beside you. Every mighty oak started as a quiet seed that dared to open. What can we tackle next?";
+      if (isFirstTimeNaming) {
+        let extractedName = query.replace(/my name is|i am|i'm|call me/gi, '').trim();
+        if (extractedName) {
+          extractedName = extractedName.charAt(0).toUpperCase() + extractedName.slice(1);
+          if (updateUserProfile) updateUserProfile('visitorName', extractedName);
+          fallbackText = `It is so wonderful to meet you, ${extractedName}! I'm Sprout, your Growth Guardian superhero. How can I protect and support you today?`;
+        }
+      }
+
       setMessages((prev) => [
         ...prev,
-        { 
-          id: Date.now() + 1, 
-          sender: 'sprout', 
-          text: `I'm right here with you${nameClause}. You don't have to carry everything alone.`, 
-          time: getTimeString() 
+        {
+          id: Date.now() + 1,
+          sender: 'sprout',
+          text: fallbackText,
+          time: getTimeString()
         }
       ]);
     }
   };
 
-
   const handleSend = (e) => {
-    if (e && e.preventDefault) {
-      e.preventDefault();
-    }
-    processInput(inputText);
+    e.preventDefault();
+    sendMessage();
   };
 
-  // Reusable Chatbot Inner Widget JSX
-  const renderChatWidgetInner = () => (
-    <>
-      {/* WhatsApp-Style Header */}
-      <div className="chat-card-header whatsapp-header">
-        <div className="chat-header-user-info">
-          <div className="avatar-pulse-wrapper">
-            <img src="/favicon.webp" alt="Sprout" className="chat-sprout-avatar-noborder" />
+  const handleDispatchSignal = async (e) => {
+    e.preventDefault();
+    if (isSendingSignal) return;
+    setIsSendingSignal(true);
+
+    try {
+      await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visitorName: userProfile?.visitorName || 'Friend in Asterra',
+          visitorEmail: userProfile?.visitorEmail,
+          visitorAge: userProfile?.visitorAge,
+          visitorLocation: userProfile?.visitorLocation,
+          message: formGrievance,
+          analyzedIssue: 'Emergency Signal Dispatched via Help Form',
+          type: 'DISPATCH_SIGNAL'
+        })
+      });
+      setSignalSent(true);
+      setFormGrievance('');
+    } catch (err) {
+      console.error('Failed to dispatch signal:', err);
+    } finally {
+      setIsSendingSignal(false);
+    }
+  };
+
+  // Render Inner Chatbot Widget matching Image 2
+  const renderImage2ChatWidget = () => (
+    <div className={`sprout-superhero-card mode-${chatMode}`}>
+      {/* Holographic light sheen reflection layer */}
+      <div className="card-glass-sheen" aria-hidden="true" />
+
+      {/* 1. Header (Matching Image 2 with superhero enhancements) */}
+      <div className="sprout-card-header-bar">
+        <div className="sprout-header-brand">
+          <div className="sprout-avatar-wrapper">
+            <div className="sprout-avatar-halo-ring" />
+            <img 
+              src="/sprout-avatar.webp" 
+              alt="Sprout Growth Guardian" 
+              className="sprout-header-avatar"
+            />
+            <span className="sprout-avatar-beacon">
+              <span className="beacon-ping" />
+              <span className="beacon-core" />
+            </span>
           </div>
-          <div className="chat-header-text">
-            <h3 className="chat-sprout-name">SPROUT</h3>
-            <span className="chat-sprout-status">Growth Guardian</span>
-          </div>
-        </div>
-        {isMobileChatOpen && (
-          <button 
-            type="button" 
-            className="icon-circle-btn mobile-close-chat-btn" 
-            onClick={() => setIsMobileChatOpen(false)}
-          >
-            <X size={18} />
-          </button>
-        )}
-      </div>
-
-      {/* 2 Interactive Modes Switcher Bar */}
-      <div className="chat-mode-tabs-bar mode-bar-2">
-        <button
-          type="button"
-          className={`mode-tab-btn ${chatMode === 'casual' ? 'active casual' : ''}`}
-          onClick={(e) => handleModeChange(e, 'casual')}
-          title="Casual conversation, stories & friendly banter"
-        >
-          <MessageCircle size={14} />
-          <span>Casual Talk</span>
-        </button>
-        <button
-          type="button"
-          className={`mode-tab-btn ${chatMode === 'help' ? 'active help' : ''}`}
-          onClick={(e) => handleModeChange(e, 'help')}
-          title="Grievance resolution & superhero signal dispatch"
-        >
-          <ShieldAlert size={14} />
-          <span>Needs Help</span>
-        </button>
-      </div>
-
-      {/* Conversation Body */}
-      <div className="chat-card-body whatsapp-body" ref={chatBodyRef}>
-        {messages.map((m) => (
-          <React.Fragment key={m.id}>
-            {m.isModeTag ? (
-              <div className="chat-mode-system-badge">
-                <span>{m.text}</span>
+          <div className="sprout-header-info">
+            <div className="sprout-title-row">
+              <h2 className="sprout-pixel-title">SPROUT</h2>
+            </div>
+            <div className="sprout-subtitle-row">
+              <span className="sprout-role-subtitle">Growth Guardian</span>
+              <div className="sprout-guardian-vitality" title="Guardian Listening">
+                <span className="vitality-bar bar-1" />
+                <span className="vitality-bar bar-2" />
+                <span className="vitality-bar bar-3" />
               </div>
-            ) : (
-              <div 
-                className={`minimal-chat-bubble ${m.sender} ${m.isRedGrievance ? 'red-grievance-bubble' : ''} ${m.isConfirmationReq ? 'confirmation-req-bubble' : ''} ${m.isSpecial ? 'special-signal' : ''} animate-beat-in`}
-              >
-                {m.sender === 'sprout' && (
-                  <img src="/favicon.webp" alt="Sprout" className="bubble-avatar-mini-noborder" />
-                )}
-                <div className="minimal-bubble-content">
-                  <p className="bubble-text">{m.text}</p>
-                  <div className="bubble-timestamp">
-                    <span>{m.time}</span>
-                    {m.sender === 'user' && <CheckCheck size={13} className="whatsapp-tick" />}
-                  </div>
-                </div>
-              </div>
-            )}
-          </React.Fragment>
-        ))}
-
-        {isTyping && (
-          <div className="minimal-chat-bubble sprout animate-beat-in">
-            <img src="/favicon.webp" alt="Sprout" className="bubble-avatar-mini-noborder" />
-            <div className="minimal-bubble-content typing-dots">
-              <span className="tdot t1" />
-              <span className="tdot t2" />
-              <span className="tdot t3" />
             </div>
           </div>
-        )}
+        </div>
+
+        {/* Window Controls: Close Only */}
+        <div className="sprout-window-controls">
+
+          <button 
+            type="button" 
+            className="sprout-win-btn close-btn interactive" 
+            title="Close Chat"
+            onClick={() => {
+              setIsClosed(true);
+              setIsMobileChatOpen(false);
+            }}
+          >
+            <X size={14} />
+          </button>
+        </div>
       </div>
 
-      {/* Action Bar: Prompt Chips in Casual mode OR Single Button in Needs Help mode */}
-      {chatMode === 'casual' ? (
-        <div className="chat-card-prompt-chips">
-          <button 
-            type="button" 
-            className="minimal-chip interactive" 
-            onClick={(e) => handlePromptClick(e, "I need your help with something.")}
-          >
-            Share a Worry
-          </button>
-          <button 
-            type="button" 
-            className="minimal-chip interactive" 
-            onClick={(e) => handlePromptClick(e, "How can I find hope today?")}
-          >
-            Seek Guidance
-          </button>
-          <button 
-            type="button" 
-            className="minimal-chip interactive" 
-            onClick={(e) => handlePromptClick(e, "Tell me about Asterra")}
-          >
-            Just Talk
-          </button>
-        </div>
-      ) : (
-        <div className="help-single-button-area">
-          {showConfirmationBtn ? (
-            <button 
-              type="button" 
-              className="confirm-send-signal-btn interactive animate-beat-in" 
-              onClick={handleConfirmSignalSend}
-            >
-              <Zap size={16} />
-              <span>Confirm & Send Signal</span>
-            </button>
-          ) : (
-            <button 
-              type="button" 
-              className="dispatch-signal-single-btn interactive" 
-              onClick={handleDispatchSignalClick}
-            >
-              <Zap size={16} />
-              <span>Dispatch the Signal</span>
-            </button>
-          )}
-        </div>
-      )}
+      <div className="sprout-header-separator" />
 
-      {/* WhatsApp-Style Input Bar */}
-      <form onSubmit={handleSend} className="chat-card-input-form whatsapp-input">
-        <input 
-          type="text" 
-          className="chat-card-input-field interactive"
-          placeholder={
-            chatMode === 'casual' 
-              ? "Chat with Sprout..." 
-              : "Describe your issue / problem..."
-          }
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-        />
-        <button type="submit" className="chat-card-send-btn interactive" title="Send message">
-          <SendHorizontal size={15} />
-        </button>
-      </form>
-    </>
+      {!isMinimized && (
+        <>
+          {/* 2. Mode Selector Toggle Pills (Matching Image 2) */}
+          <div className="sprout-mode-toggle-row">
+            <button
+              type="button"
+              className={`sprout-mode-pill mode-btn-casual interactive ${chatMode === 'casual' ? 'active' : ''}`}
+              onClick={(e) => handleModeChange(e, 'casual')}
+            >
+              <MessageCircle size={15} className="mode-icon-bounce" />
+              <span>Casual Talk</span>
+            </button>
+
+            <button
+              type="button"
+              className={`sprout-mode-pill mode-btn-help interactive ${chatMode === 'help' ? 'active' : ''}`}
+              onClick={(e) => handleModeChange(e, 'help')}
+            >
+              <Shield size={15} className="mode-icon-pulse" />
+              <span>Needs Help</span>
+            </button>
+          </div>
+
+          {/* 3. Conversation Message Area or Needs Help Form */}
+          {chatMode === 'casual' ? (
+            <>
+              <div className="sprout-chat-messages-scroll" ref={chatBodyRef}>
+                {messages.map((m) => (
+                  <React.Fragment key={m.id}>
+                    {m.isModeTag ? (
+                      <div className="sprout-mode-tag-pill">
+                        <span>{m.text}</span>
+                      </div>
+                    ) : (
+                      <div className={`sprout-message-row ${m.sender}`}>
+                        {m.sender === 'sprout' && (
+                          <img 
+                            src="/sprout-avatar.webp" 
+                            alt="Sprout" 
+                            className="sprout-bubble-avatar" 
+                          />
+                        )}
+
+                        <div className="sprout-bubble-box">
+                          <p className="sprout-bubble-text">{m.text}</p>
+                          <div className="sprout-bubble-meta">
+                            <span className="sprout-bubble-time">{m.time}</span>
+                            {m.sender === 'user' && <CheckCheck size={12} className="tick-icon" />}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </React.Fragment>
+                ))}
+
+                {isTyping && (
+                  <div className="sprout-message-row sprout">
+                    <img src="/sprout-avatar.webp" alt="Sprout" className="sprout-bubble-avatar" />
+                    <div className="sprout-bubble-box typing-container">
+                      <span className="typing-dot" />
+                      <span className="typing-dot" />
+                      <span className="typing-dot" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Quick Action Chips (Matching Image 2) */}
+              <div className="sprout-quick-chips-row">
+                <button
+                  type="button"
+                  className="sprout-chip-btn interactive"
+                  onClick={(e) => handlePromptClick(e, "I want to share a worry with you Sprout...")}
+                >
+                  Share a Worry
+                </button>
+                <button
+                  type="button"
+                  className="sprout-chip-btn interactive"
+                  onClick={(e) => handlePromptClick(e, "Can you give me some guidance and courage?")}
+                >
+                  Seek Guidance
+                </button>
+              </div>
+
+              {/* 5. Input Form (Matching Image 2) */}
+              <form onSubmit={handleSend} className="sprout-input-form-row">
+                <input
+                  type="text"
+                  className="sprout-text-input interactive"
+                  placeholder="Chat with Sprout..."
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                />
+                <button 
+                  type="submit" 
+                  className="sprout-circular-send-btn interactive" 
+                  title="Send to Sprout"
+                >
+                  <Send size={15} />
+                </button>
+              </form>
+            </>
+          ) : (
+            <div className="sprout-help-form-container">
+              {signalSent ? (
+                <div className="sprout-signal-sent-card">
+                  <div className="signal-success-icon"><ShieldAlert size={32} color="#2ECC71" /></div>
+                  <h3>Signal Dispatched!</h3>
+                  <p>A superhero has been notified and is coming to help. Check your email for an immediate beacon of hope!</p>
+                  <button className="sprout-return-casual-btn interactive" onClick={() => handleModeChange(null, 'casual')}>Return to Chat</button>
+                </div>
+              ) : (
+                <form className="sprout-needs-help-form" onSubmit={handleDispatchSignal}>
+                  <p className="form-intro">You are not alone. Send an emergency beacon directly to a superhero.</p>
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label>Name</label>
+                      <input type="text" value={userProfile?.visitorName || ''} onChange={(e) => updateUserProfile && updateUserProfile('visitorName', e.target.value)} placeholder="Your Name" required />
+                    </div>
+                    <div className="form-group">
+                      <label>Age</label>
+                      <input type="text" value={userProfile?.visitorAge || ''} onChange={(e) => updateUserProfile && updateUserProfile('visitorAge', e.target.value)} placeholder="Your Age" required />
+                    </div>
+                    <div className="form-group">
+                      <label>Location</label>
+                      <input type="text" value={userProfile?.visitorLocation || ''} onChange={(e) => updateUserProfile && updateUserProfile('visitorLocation', e.target.value)} placeholder="Your Location" required />
+                    </div>
+                    <div className="form-group">
+                      <label>Email Address</label>
+                      <input type="email" value={userProfile?.visitorEmail || ''} onChange={(e) => updateUserProfile && updateUserProfile('visitorEmail', e.target.value)} placeholder="Your Email" required />
+                    </div>
+                  </div>
+                  <div className="form-group full-width">
+                    <label>Grievance / Issue</label>
+                    <textarea 
+                      value={formGrievance} 
+                      onChange={(e) => setFormGrievance(e.target.value)} 
+                      placeholder="Tell us what you are facing..." 
+                      rows={4}
+                      required 
+                    />
+                  </div>
+                  <button type="submit" className="sprout-dispatch-btn interactive glowing-border-btn" disabled={isSendingSignal}>
+                    {isSendingSignal ? 'Dispatching...' : 'Dispatch Signal'}
+                    <SendHorizontal size={16} style={{ marginLeft: 8 }} />
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 
   return (
-    <section id="home" className="hero-wrapper">
-      {/* Top Header - Branding with Out-of-Screen Entrance Animation */}
-      <header className="hero-top-navbar animate-hero-nav">
-        <div className="brand-logo-reference">
-          <img src="/title.webp" alt="Sprout Title" className="brand-title-image-header" />
-        </div>
-      </header>
-
-      {/* Zero-CLS Blur Placeholder Background */}
-      {heroBlurSrc && (
-        <div 
-          className="hero-bg-blur-placeholder"
-          style={{ backgroundImage: `url("${encodeURI(heroBlurSrc)}")` }}
-        />
-      )}
-
-      {/* 100% Fill Proper High-Quality Hero Background */}
-      <div 
-        className="hero-bg-animated loaded"
-        style={{
-          backgroundImage: `url("${encodeURI(heroImageSrc || '/story/hero bg pc.webp')}")`
-        }}
-      />
-
-      {/* Radial Gradient Overlay */}
-      <div className="hero-overlay-gradient" />
-
-      {/* Living Ambient Particle Canvas */}
-      <ParticleCanvas sceneId={1} emotionalState="WONDER" />
-
-      {/* Left Column Story Content with Premium Out-of-Screen Entrance Animations */}
-      <div className="hero-left-story-content reference-matched animate-hero-left">
-
-        <h1 className="hero-story-title reference-title">
-          <span className="title-line-1 animate-title-line-1">A kinder</span>
-          <br />
-          <span className="title-line-2 animate-title-line-2" style={{ color: 'var(--color-gold-bright)' }}>tomorrow.</span>
-        </h1>
-
-        <p className="hero-story-subtitle reference-subtitle animate-subtitle-fade">
-          A little light, a listening friend,<br />
-          and a place to begin.
-        </p>
-
-        {/* Story Mode Primary CTA — both CTAs are here; CSS hides chat btn on desktop */}
-        <div className="reference-buttons-row animate-cta-pop">
-          <button 
-            type="button" 
-            className="ref-btn-primary-explore interactive"
-            onClick={onStartStory}
-          >
-            <span>Explore the Story</span>
-            <ArrowRight size={18} />
-          </button>
-          {/* Chat button — visible only on mobile via CSS */}
-          {!isStoryActive && (
-            <button
-              type="button"
-              className="mobile-inline-chat-btn mobile-chat-toggle-btn interactive"
-              onClick={() => setIsMobileChatOpen(true)}
-            >
-              <MessageCircle size={17} />
-              <span>Chat with Sprout</span>
-            </button>
-          )}
-        </div>
+    <section id="home" className="hero-wrapper continuous-section section-hero">
+      {/* Dynamic Ambient Particle Overlay */}
+      <div className="hero-particle-overlay">
+        <ParticleCanvas sceneId={1} emotionalState="WONDER" />
       </div>
 
-      {/* DESKTOP CHAT WIDGET */}
-      {!isStoryActive && (
-        <div className={`hero-right-chatbot-card whatsapp-style desktop-only-card mode-${chatMode} animate-hero-right ${isEmergencyActive ? 'emergency-flashing-active' : ''}`}>
-          {renderChatWidgetInner()}
+      {/* Main Hero Foreground Content Grid */}
+      <div className="hero-main-layer-container">
+        
+        {/* Ambient Overlays Matching Background Portions (Badges, Squirrel, & Flowers) */}
+        <div className="bg-matched-animations" aria-hidden="true">
+          {/* 1. The 3 Badges Glow Auras (A Kinder World, Stronger Together, Brighter Tomorrows) */}
+          <div className="bg-badge-glow-cluster" style={{ position: 'absolute', top: '8.8%', left: '8%', pointerEvents: 'none', zIndex: 12 }}>
+            <span className="badge-aura-pulse leaf" title="A Kinder World" />
+            <span className="badge-aura-pulse people" title="Stronger Together" />
+            <span className="badge-aura-pulse sun" title="Brighter Tomorrows" />
+          </div>
+
+          {/* 2. Nature Fireflies Playing Around the Squirrel */}
+          <div className="bg-squirrel-fireflies" style={{ position: 'absolute', top: '10.5%', left: '39%', pointerEvents: 'none', zIndex: 12 }}>
+            <span className="firefly-orb f1" />
+            <span className="firefly-orb f2" />
+            <span className="firefly-orb f3" />
+          </div>
+
+          {/* 3. White Flower Dewdrop Twinkles on the Moss Bank */}
+          <div className="bg-flower-dewdrops" style={{ position: 'absolute', top: '18.2%', left: '50%', transform: 'translateX(-50%)', width: '85%', maxWidth: '900px', pointerEvents: 'none', zIndex: 12 }}>
+            <span className="dewdrop-twinkle d1" style={{ position: 'absolute', left: '15%', top: '0' }}>✧</span>
+            <span className="dewdrop-twinkle d2" style={{ position: 'absolute', left: '42%', top: '5px' }}>✦</span>
+            <span className="dewdrop-twinkle d3" style={{ position: 'absolute', left: '68%', top: '-2px' }}>✧</span>
+            <span className="dewdrop-twinkle d4" style={{ position: 'absolute', left: '88%', top: '4px' }}>✦</span>
+          </div>
         </div>
-      )}
+
+        {/* ACTION BUTTONS DOCK: Sits at the bottom of the first screen (100vh) */}
+        <div 
+          className="hero-buttons-slot animate-hero-left"
+          style={{
+            position: 'absolute',
+            top: '88vh',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 25,
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'center'
+          }}
+        >
+          <div className="hero-action-dock-container">
+            {/* Ambient subtle floating nature sparks */}
+            <div className="dock-ambient-spores" aria-hidden="true">
+              <span className="spore-mote mote-1">✦</span>
+              <span className="spore-mote mote-2">✧</span>
+              <span className="spore-mote mote-3">✦</span>
+            </div>
+
+            <div className="hero-bottom-actions-row hero-actions-dock" style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+              <button 
+                type="button" 
+                className="hero-btn-primary-journey btn-shimmer interactive glowing-border-btn"
+                onClick={onStartStory}
+              >
+                <span className="btn-ambient-beam" />
+                <span className="btn-text-label">See the story</span>
+                <ArrowRight size={16} className="journey-arrow-icon" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Chatbot Widget (Matching Image 2) */}
+        {!isClosed && (
+          <div 
+            className={`hero-right-chatbot-wrapper animate-hero-right desktop-only ${isMinimized ? 'minimized' : ''}`}
+          >
+            {renderImage2ChatWidget()}
+          </div>
+        )}
+
+        {/* Floating Closed Summon Launcher Button */}
+        {isClosed && (
+          <div className="closed-chat-summon-trigger animate-beat-in desktop-only">
+            <button 
+              type="button" 
+              className="sprout-summon-btn interactive"
+              onClick={() => {
+                setIsClosed(false);
+                setIsMinimized(false);
+              }}
+              title="Open Sprout Chat"
+            >
+              <img src="/sprout-avatar.webp" alt="Sprout" className="summon-avatar" />
+              <span>Ask Sprout</span>
+              <span className="summon-pulse-dot" />
+            </button>
+          </div>
+        )}
+
+      </div>
 
       {/* MOBILE FLOATING TRIGGER BUTTON */}
       {!isStoryActive && (
@@ -635,28 +602,25 @@ export default function HeroSection({ isStoryActive, onStartStory, userProfile, 
             className="mobile-chat-toggle-btn interactive"
             onClick={() => setIsMobileChatOpen(true)}
           >
-            <MessageCircle size={18} />
-            <span>Chat with Sprout</span>
+            <img src="/sprout-avatar.webp" alt="Sprout" className="mobile-btn-avatar" />
+            <span>Ask Sprout</span>
             <span className="mobile-unread-dot" />
           </button>
         </div>
       )}
 
-      {/* MOBILE BOTTOM SHEET CHAT DRAWER */}
+      {/* MOBILE CHAT DRAWER */}
       {isMobileChatOpen && (
         <div className="mobile-chat-overlay" onClick={() => setIsMobileChatOpen(false)}>
           <div 
-            className={`mobile-chat-bottom-sheet mode-${chatMode}`} 
+            className="mobile-chat-bottom-sheet"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mobile-sheet-drag-pill" />
-            {renderChatWidgetInner()}
+            {renderImage2ChatWidget()}
           </div>
         </div>
       )}
     </section>
   );
 }
-
-
-
