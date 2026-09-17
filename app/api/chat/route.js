@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-const GEMINI_MODEL = 'gemini-3.6-flash';
-const FALLBACK_MODEL = 'gemini-3.7-flash';
+const GEMINI_MODEL = 'gemini-1.5-flash';
+const FALLBACK_MODEL = 'gemini-1.5-pro';
 
 async function callGemini(apiKey, payload, model = GEMINI_MODEL) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
