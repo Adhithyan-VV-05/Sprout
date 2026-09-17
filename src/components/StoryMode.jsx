@@ -34,7 +34,9 @@ export default function StoryMode({
   const { 
     userProfile: ctxUserProfile, 
     updateUserProfile: ctxUpdateUserProfile, 
-    setPostStoryTrigger 
+    setPostStoryTrigger,
+    storyPreloadProgress = 100,
+    storyImagesLoaded = true
   } = useAppState();
 
   const userProfile = propUserProfile || ctxUserProfile;
@@ -248,6 +250,55 @@ export default function StoryMode({
   };
 
   if (!isActive) return null;
+
+  if (!storyImagesLoaded) {
+    const r = 16;
+    const c = 2 * Math.PI * r; // ~100.53
+    const offset = c - (Math.min(100, Math.max(0, storyPreloadProgress)) / 100) * c;
+
+    return (
+      <div className="fullscreen-story-modal-overlay story-buffering-overlay">
+        <div className="story-buffering-card">
+          <div className="story-circular-loader is-syncing" style={{ width: 46, height: 46 }}>
+            <svg className="story-circular-svg" width="46" height="46" viewBox="0 0 46 46">
+              <defs>
+                <linearGradient id="orangeStoryBuffering" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#f97316" />
+                  <stop offset="50%" stopColor="#fb923c" />
+                  <stop offset="100%" stopColor="#fbbf24" />
+                </linearGradient>
+              </defs>
+              <circle cx="23" cy="23" r="20" className="circular-outer-sonar" />
+              <circle cx="23" cy="23" r={r} className="circular-track-bg" strokeWidth="3" />
+              <circle 
+                cx="23" 
+                cy="23" 
+                r={r} 
+                className="circular-progress-fill" 
+                stroke="url(#orangeStoryBuffering)" 
+                strokeWidth="3" 
+                strokeDasharray={c} 
+                strokeDashoffset={offset} 
+                strokeLinecap="round" 
+                transform="rotate(-90 23 23)" 
+              />
+            </svg>
+            <div className="circular-center-badge" style={{ fontSize: '0.8rem' }}>
+              <span className="circular-pct-num">{storyPreloadProgress}%</span>
+            </div>
+          </div>
+          <div className="story-buffering-text">
+            <div className="btn-orange-toggle-pill">
+              <span className="orange-toggle-dot" />
+              <span>CACHING SCENES</span>
+            </div>
+            <h3>Loading Velora Archives...</h3>
+            <p>Buffering all 12 chapters in cinematic high definition ({storyPreloadProgress}%)</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 

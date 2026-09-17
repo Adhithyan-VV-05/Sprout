@@ -30,9 +30,93 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAppState } from '../context/AppStateContext';
 
+function CircularStoryProgress({ progress = 0, isLoaded = false, isWaiting = false }) {
+  const radius = 10;
+  const strokeWidth = 2.4;
+  const circumference = 2 * Math.PI * radius; // 62.83
+  const strokeDashoffset = circumference - (Math.min(100, Math.max(0, progress)) / 100) * circumference;
+
+  return (
+    <div className={`story-circular-loader ${isLoaded ? 'is-complete' : 'is-syncing'} ${isWaiting ? 'is-waiting' : ''}`} aria-hidden="true">
+      <svg className="story-circular-svg" width="28" height="28" viewBox="0 0 28 28">
+        <defs>
+          <linearGradient id="orangeToggleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#f97316" />
+            <stop offset="50%" stopColor="#fb923c" />
+            <stop offset="100%" stopColor="#fbbf24" />
+          </linearGradient>
+        </defs>
+
+        {/* Ambient Pulsing Radar Ring */}
+        <circle
+          cx="14"
+          cy="14"
+          r="12.5"
+          className="circular-outer-sonar"
+        />
+
+        {/* Background Track */}
+        <circle
+          cx="14"
+          cy="14"
+          r={radius}
+          className="circular-track-bg"
+          strokeWidth={strokeWidth}
+        />
+
+        {/* Dynamic Progressive Fill */}
+        <circle
+          cx="14"
+          cy="14"
+          r={radius}
+          className="circular-progress-fill"
+          stroke="url(#orangeToggleGradient)"
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          transform="rotate(-90 14 14)"
+        />
+      </svg>
+
+      {/* Center indicator: percentage number when loading, checkmark when ready */}
+      <div className="circular-center-badge">
+        {isLoaded ? (
+          <span className="circular-check-icon">✓</span>
+        ) : (
+          <span className="circular-pct-num">{progress}%</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function HeroSection() {
-  const { userProfile, updateUserProfile, postStoryTrigger } = useAppState();
+  const { 
+    userProfile, 
+    updateUserProfile, 
+    postStoryTrigger,
+    storyPreloadProgress = 0,
+    storyImagesLoaded = false
+  } = useAppState();
   const router = useRouter();
+  const [isWaitingForStory, setIsWaitingForStory] = useState(false);
+
+  useEffect(() => {
+    if (isWaitingForStory && storyImagesLoaded) {
+      router.push('/story');
+    }
+  }, [isWaitingForStory, storyImagesLoaded, router]);
+
+  const handleSeeStoryClick = (e) => {
+    e.preventDefault();
+    if (storyImagesLoaded) {
+      router.push('/story');
+    } else {
+      setIsWaitingForStory(true);
+    }
+  };
+
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [chatMode, setChatMode] = useState('casual'); // 'casual' | 'help'
@@ -599,15 +683,42 @@ export default function HeroSection() {
             </div>
 
             <div className="hero-bottom-actions-row hero-actions-dock" style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-              <Link 
-                href="/story"
-                className="hero-btn-primary-journey btn-shimmer interactive glowing-border-btn"
-                style={{ textDecoration: 'none' }}
+              <button 
+                type="button"
+                onClick={handleSeeStoryClick}
+                className={`hero-btn-primary-journey btn-shimmer interactive glowing-border-btn ${
+                  !storyImagesLoaded ? 'btn-orange-toggling-active' : 'btn-story-unlocked'
+                } ${isWaitingForStory ? 'btn-story-dispatching' : ''}`}
+                title={storyImagesLoaded ? 'See the story' : `Buffering scenes: ${storyPreloadProgress}%`}
               >
                 <span className="btn-ambient-beam" />
-                <span className="btn-text-label">See the story</span>
-                <ArrowRight size={16} className="journey-arrow-icon" />
-              </Link>
+
+                {/* Circular progressive bar with orange toggling way */}
+                <CircularStoryProgress 
+                  progress={storyPreloadProgress} 
+                  isLoaded={storyImagesLoaded} 
+                  isWaiting={isWaitingForStory} 
+                />
+
+                <span className="btn-text-label">
+                  {isWaitingForStory && !storyImagesLoaded
+                    ? `Preparing Story (${storyPreloadProgress}%)`
+                    : 'See the story'
+                  }
+                </span>
+
+                {/* Orange Toggle Status Pill Indicator */}
+                {!storyImagesLoaded && (
+                  <span className="btn-orange-toggle-pill">
+                    <span className="orange-toggle-dot" />
+                    <span>{isWaitingForStory ? 'LOADING' : 'SYNCING'}</span>
+                  </span>
+                )}
+
+                {storyImagesLoaded && (
+                  <ArrowRight size={16} className="journey-arrow-icon" />
+                )}
+              </button>
             </div>
           </div>
         </div>
