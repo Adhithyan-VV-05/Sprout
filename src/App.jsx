@@ -1,41 +1,25 @@
-import React, { useState } from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import HeroSection from './components/HeroSection';
 import SectionJourney from './components/SectionJourney';
 import SectionPillars from './components/SectionPillars';
 import SectionReflection from './components/SectionReflection';
-import StoryMode from './components/StoryMode';
-import CustomCursor from './components/CustomCursor';
 import LoadingScreen from './components/LoadingScreen';
 import { layoutConfig, calcBgOffset } from './config/layoutConfig';
+import { useAppState } from './context/AppStateContext';
 
 export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [isStoryActive, setIsStoryActive] = useState(false);
-  const [initialSceneId, setInitialSceneId] = useState(1);
-  const mainBg = layoutConfig.mainBackground;
+  const { hasLoadedBefore, setHasLoadedBefore } = useAppState();
+  const [isLoading, setIsLoading] = useState(!hasLoadedBefore);
   
-  const [userProfile, setUserProfile] = useState({
-    visitorName: '',
-    visitorAge: '',
-    visitorLocation: '',
-    visitorGender: '',
-    visitorEmail: ''
-  });
-  const [postStoryTrigger, setPostStoryTrigger] = useState(null);
+  const mainBg = layoutConfig.mainBackground;
 
-  const updateUserProfile = (key, value) => {
-    setUserProfile((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleStartStory = (sceneId = 1) => {
-    setInitialSceneId(sceneId);
-    setIsStoryActive(true);
-  };
-
-  const handleStoryFinished = () => {
-    setIsStoryActive(false);
-    setPostStoryTrigger(Date.now());
-  };
+  useEffect(() => {
+    if (!isLoading) {
+      setHasLoadedBefore(true);
+    }
+  }, [isLoading, setHasLoadedBefore]);
 
   if (isLoading) {
     return <LoadingScreen onLoadingComplete={() => setIsLoading(false)} />;
@@ -43,9 +27,6 @@ export default function App() {
 
   return (
     <div className="continuous-site-flow fade-in-flow">
-      {/* Custom Awwwards Magnetic Cursor */}
-      <CustomCursor />
-
       {/* Single Continuous Full-Page Background Poster Image */}
       <div className="single-full-backdrop">
         <img 
@@ -57,23 +38,7 @@ export default function App() {
       </div>
 
       {/* Main Interactive Hero Layer with Chatbox & Story Triggers */}
-      <HeroSection 
-        isStoryActive={isStoryActive}
-        onStartStory={() => handleStartStory(1)}
-        userProfile={userProfile}
-        updateUserProfile={updateUserProfile}
-        postStoryTrigger={postStoryTrigger}
-      />
-
-      {/* Interactive Dedicated Story Mode Section */}
-      <StoryMode 
-        isActive={isStoryActive}
-        initialSceneId={initialSceneId}
-        onClose={() => setIsStoryActive(false)}
-        onStoryFinished={handleStoryFinished}
-        userProfile={userProfile}
-        updateUserProfile={updateUserProfile}
-      />
+      <HeroSection />
     </div>
   );
 }

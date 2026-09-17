@@ -26,8 +26,13 @@ import {
 } from 'lucide-react';
 import ParticleCanvas from './ParticleCanvas';
 import { layoutConfig } from '../config/layoutConfig';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useAppState } from '../context/AppStateContext';
 
-export default function HeroSection({ isStoryActive, onStartStory, userProfile, updateUserProfile, postStoryTrigger }) {
+export default function HeroSection() {
+  const { userProfile, updateUserProfile, postStoryTrigger } = useAppState();
+  const router = useRouter();
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [chatMode, setChatMode] = useState('casual'); // 'casual' | 'help'
@@ -259,12 +264,14 @@ export default function HeroSection({ isStoryActive, onStartStory, userProfile, 
     if (isSendingSignal) return;
     setIsSendingSignal(true);
 
+    const startTime = Date.now();
+
     try {
       await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          visitorName: userProfile?.visitorName || 'Friend in Asterra',
+          visitorName: userProfile?.visitorName || 'Friend in Velora',
           visitorEmail: userProfile?.visitorEmail,
           visitorAge: userProfile?.visitorAge,
           visitorLocation: userProfile?.visitorLocation,
@@ -273,6 +280,13 @@ export default function HeroSection({ isStoryActive, onStartStory, userProfile, 
           type: 'DISPATCH_SIGNAL'
         })
       });
+
+      // Allow the cinematic dispatch animation to display smoothly
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 1800) {
+        await new Promise((resolve) => setTimeout(resolve, 1800 - elapsed));
+      }
+
       setSignalSent(true);
       setFormGrievance('');
     } catch (err) {
@@ -442,9 +456,43 @@ export default function HeroSection({ isStoryActive, onStartStory, userProfile, 
             </>
           ) : (
             <div className="sprout-help-form-container">
-              {signalSent ? (
-                <div className="sprout-signal-sent-card">
-                  <div className="signal-success-icon"><ShieldAlert size={32} color="#2ECC71" /></div>
+              {isSendingSignal ? (
+                <div className="sprout-dispatching-overlay">
+                  <div className="dispatch-beacon-core">
+                    <div className="beacon-ring ring-1" />
+                    <div className="beacon-ring ring-2" />
+                    <div className="beacon-ring ring-3" />
+                    <div className="beacon-avatar-wrap">
+                      <img src="/sprout-avatar.webp" alt="Sprout Beacon" className="beacon-avatar-img" />
+                      <div className="beacon-sweep-radar" />
+                    </div>
+                  </div>
+
+                  <div className="dispatch-status-box">
+                    <div className="dispatch-badge-pill">
+                      <span className="dispatch-live-dot" />
+                      <span>BROADCASTING EMERGENCY BEACON</span>
+                    </div>
+                    <h3 className="dispatch-title">Transmitting to Sprout...</h3>
+                    <p className="dispatch-desc">Locking telemetry coordinates. Dispatching Guardian rescue beacon across Velora.</p>
+
+                    <div className="dispatch-meter-track">
+                      <div className="dispatch-meter-fill" />
+                    </div>
+
+                    <div className="dispatch-coordinates-text">
+                      <span>FREQ: 842.10 MHz</span>
+                      <span>SECURE DISPATCH ENCRYPTED</span>
+                    </div>
+                  </div>
+                </div>
+              ) : signalSent ? (
+                <div className="sprout-signal-sent-card animate-scale-up">
+                  <div className="signal-success-icon-wrap">
+                    <div className="signal-burst-ring ring-burst-1" />
+                    <div className="signal-burst-ring ring-burst-2" />
+                    <div className="signal-success-icon"><ShieldAlert size={36} color="#2ECC71" /></div>
+                  </div>
                   <h3>Signal Dispatched!</h3>
                   <p>A superhero has been notified and is coming to help. Check your email for an immediate beacon of hope!</p>
                   <button className="sprout-return-casual-btn interactive" onClick={() => handleModeChange(null, 'casual')}>Return to Chat</button>
@@ -551,15 +599,15 @@ export default function HeroSection({ isStoryActive, onStartStory, userProfile, 
             </div>
 
             <div className="hero-bottom-actions-row hero-actions-dock" style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-              <button 
-                type="button" 
+              <Link 
+                href="/story"
                 className="hero-btn-primary-journey btn-shimmer interactive glowing-border-btn"
-                onClick={onStartStory}
+                style={{ textDecoration: 'none' }}
               >
                 <span className="btn-ambient-beam" />
                 <span className="btn-text-label">See the story</span>
                 <ArrowRight size={16} className="journey-arrow-icon" />
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -595,19 +643,17 @@ export default function HeroSection({ isStoryActive, onStartStory, userProfile, 
       </div>
 
       {/* MOBILE FLOATING TRIGGER BUTTON */}
-      {!isStoryActive && (
-        <div className="mobile-chat-trigger-bar">
-          <button 
-            type="button" 
-            className="mobile-chat-toggle-btn interactive"
-            onClick={() => setIsMobileChatOpen(true)}
-          >
-            <img src="/sprout-avatar.webp" alt="Sprout" className="mobile-btn-avatar" />
-            <span>Ask Sprout</span>
-            <span className="mobile-unread-dot" />
-          </button>
-        </div>
-      )}
+      <div className="mobile-chat-trigger-bar">
+        <button 
+          type="button" 
+          className="mobile-chat-toggle-btn interactive"
+          onClick={() => setIsMobileChatOpen(true)}
+        >
+          <img src="/sprout-avatar.webp" alt="Sprout" className="mobile-btn-avatar" />
+          <span>Ask Sprout</span>
+          <span className="mobile-unread-dot" />
+        </button>
+      </div>
 
       {/* MOBILE CHAT DRAWER */}
       {isMobileChatOpen && (

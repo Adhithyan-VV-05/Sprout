@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, ChevronRight, ChevronLeft, ArrowRight, RotateCcw, Heart } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, ArrowRight } from 'lucide-react';
 import { STORY_SCENES } from '../data/storyData';
 import ParticleCanvas from './ParticleCanvas';
+import { useRouter } from 'next/navigation';
+import { useAppState } from '../context/AppStateContext';
 
 const renderTextWithPlaceholders = (text) => {
   if (typeof text !== 'string') return text;
@@ -21,13 +23,23 @@ const renderTextWithPlaceholders = (text) => {
 };
 
 export default function StoryMode({ 
-  isActive, 
+  isActive = true, 
   onClose, 
   onStoryFinished, 
-  userProfile, 
-  updateUserProfile, 
+  userProfile: propUserProfile, 
+  updateUserProfile: propUpdateUserProfile, 
   initialSceneId = 1 
 }) {
+  const router = useRouter();
+  const { 
+    userProfile: ctxUserProfile, 
+    updateUserProfile: ctxUpdateUserProfile, 
+    setPostStoryTrigger 
+  } = useAppState();
+
+  const userProfile = propUserProfile || ctxUserProfile;
+  const updateUserProfile = propUpdateUserProfile || ctxUpdateUserProfile;
+
   const [beatIndex, setBeatIndex] = useState(0);
   const [localName, setLocalName] = useState(userProfile?.visitorName || '');
   const [localLocation, setLocalLocation] = useState(userProfile?.visitorLocation || '');
@@ -123,7 +135,7 @@ export default function StoryMode({
   }, [isActive]);
 
   const getSpeakerBgClass = (speaker) => {
-    if (!speaker) return 'bg-narration';
+    if (!speaker || speaker.toLowerCase().includes('narrator')) return 'bg-narration';
     if (speaker.toLowerCase().includes('sprout')) return 'bg-sprout';
     return 'bg-roboman';
   };
@@ -160,6 +172,14 @@ export default function StoryMode({
     }
   };
 
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      router.push('/');
+    }
+  };
+
   // Keyboard Navigation
   useEffect(() => {
     if (!isActive) return;
@@ -174,7 +194,7 @@ export default function StoryMode({
         e.preventDefault();
         handlePrev();
       } else if (e.key === 'Escape') {
-        onClose();
+        handleClose();
       }
     };
 
@@ -189,14 +209,18 @@ export default function StoryMode({
     handleNext();
   };
 
+  const [isDispatching, setIsDispatching] = useState(false);
+
   const handleReturnToSprout = () => {
+    setIsDispatching(true);
+
     // Dispatch complete info collected email to both hero and visitor
     try {
       fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          visitorName: userProfile?.visitorName || localName || 'Friend in Asterra',
+          visitorName: userProfile?.visitorName || localName || 'Friend in Velora',
           visitorEmail: userProfile?.visitorEmail || localEmail,
           visitorAge: userProfile?.visitorAge || localAge,
           visitorLocation: userProfile?.visitorLocation || localLocation,
@@ -210,11 +234,17 @@ export default function StoryMode({
       console.warn('Final story email dispatch notice:', err);
     }
 
-    if (onStoryFinished) {
-      onStoryFinished();
-    } else {
-      onClose();
-    }
+    setTimeout(() => {
+      if (setPostStoryTrigger) {
+        setPostStoryTrigger(Date.now());
+      }
+
+      if (onStoryFinished) {
+        onStoryFinished();
+      } else {
+        router.push('/');
+      }
+    }, 1500);
   };
 
   if (!isActive) return null;
@@ -279,7 +309,7 @@ export default function StoryMode({
             className="minimal-story-close-btn"
             onClick={(e) => {
               e.stopPropagation();
-              onClose();
+              handleClose();
             }}
             title="Close Story (Esc)"
             aria-label="Close Story"
@@ -311,7 +341,7 @@ export default function StoryMode({
           {currentBeat.type !== 'scene-direction' && 
            !currentBeat.type?.startsWith('interactive-') && (
             <div className={`minimal-story-body-text ${currentBeat.type || 'narrative'} ${getSpeakerBgClass(currentBeat.speaker)}`}>
-              {currentBeat.speaker && (
+              {currentBeat.speaker && !currentBeat.speaker.toLowerCase().includes('narrator') && (
                 <span className={`minimal-speaker-prefix ${currentBeat.speaker.toLowerCase().includes('sprout') ? 'speaker-sprout' : 'speaker-other'}`}>
                   {currentBeat.speaker}:
                 </span>
@@ -511,7 +541,32 @@ export default function StoryMode({
         </div>
       </footer>
 
+      {/* Cinematic Dispatching Overlay during Story Finish */}
+      {isDispatching && (
+        <div className="story-dispatching-overlay no-screen-click">
+          <div className="dispatch-beacon-core">
+            <div className="beacon-ring ring-1" />
+            <div className="beacon-ring ring-2" />
+            <div className="beacon-ring ring-3" />
+            <div className="beacon-avatar-wrap">
+              <img src="/sprout-avatar.webp" alt="Sprout" className="beacon-avatar-img" />
+              <div className="beacon-sweep-radar" />
+            </div>
+          </div>
+          <div className="dispatch-status-box">
+            <div className="dispatch-badge-pill">
+              <span className="dispatch-live-dot" />
+              <span>DISPATCHING JOURNEY ARCHIVES</span>
+            </div>
+            <h3 className="dispatch-title">Connecting to Sprout...</h3>
+            <p className="dispatch-desc">Synchronizing Velora memory archives. Returning to Guardian Sprout...</p>
+            <div className="dispatch-meter-track">
+              <div className="dispatch-meter-fill" />
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
-

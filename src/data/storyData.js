@@ -215,8 +215,7 @@ export const STORY_SCENES = [
       { text: "Sunlight broke through the ancient canopy. The rivers sparkled with renewed life.", type: "narrative" },
       { text: "Velora had healed — not into what it was, but into something far kinder and stronger.", type: "highlight" },
       { 
-        text: "“Not all superheroes come with physical strength. Some heal the world with kindness, empathy, and listening hearts.”", 
-        speaker: "Sprout", 
+        text: "“Not all superheroes come with physical strength. They build hope, unite hearts, and heal the world through kindness, empathy, and listening hearts.”", 
         type: "hero-quote" 
       }
     ]

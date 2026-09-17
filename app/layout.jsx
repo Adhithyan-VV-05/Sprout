@@ -1,4 +1,6 @@
 import '../src/index.css';
+import { AppStateProvider } from '../src/context/AppStateContext';
+import CustomCursor from '../src/components/CustomCursor';
 
 export const metadata = {
   title: 'SPROUT — The Growth Guardian | Interactive Superhero Story & AI Chatbot',
@@ -16,7 +18,12 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Press+Start+2P&family=Outfit:wght@500;600;700;800&family=Caveat:wght@600&display=swap" rel="stylesheet" />
       </head>
-      <body>{children}</body>
+      <body>
+        <AppStateProvider>
+          <CustomCursor />
+          {children}
+        </AppStateProvider>
+      </body>
     </html>
   );
 }

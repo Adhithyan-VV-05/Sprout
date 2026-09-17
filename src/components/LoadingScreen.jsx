@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { layoutConfig } from '../config/layoutConfig';
 
 export default function LoadingScreen({ onLoadingComplete }) {
   const [progress, setProgress] = useState(0);
@@ -6,7 +7,7 @@ export default function LoadingScreen({ onLoadingComplete }) {
   useEffect(() => {
     // 1. Preload the massive main background image explicitly
     const bgImage = new Image();
-    bgImage.src = '/main-story/main-bg-opt.webp';
+    bgImage.src = layoutConfig.mainBackground.image;
 
     // 2. Preload Sprout's Avatar for immediate rendering
     const avatar = new Image();

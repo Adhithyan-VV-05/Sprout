@@ -72,151 +72,192 @@ input, textarea {
    CUSTOM AWWWARDS MAGNETIC CURSOR
    ========================================================================== */
 /* ==========================================================================
-   CUSTOM AWWWARDS MAGNETIC CURSOR (DYNAMIC THEMED COLORS & ANIMATIONS)
+   CUSTOM AWWWARDS MAGNETIC CURSOR (SMOOTH HARDWARE-ACCELERATED)
    ========================================================================== */
-.awwwards-cursor-dot {
+
+/* Hide default cursor on desktop pointer devices */
+@media (pointer: fine) {
+  *, *::before, *::after {
+    cursor: none !important;
+  }
+}
+
+.awwwards-cursor-system {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999999;
+  transition: opacity 0.25s ease;
+}
+
+.awwwards-cursor-system.cursor-hidden {
+  opacity: 0;
+}
+
+.awwwards-cursor-system.cursor-visible {
+  opacity: 1;
+}
+
+/* Position Wrappers (Handled strictly by translate3d with NO CSS transition on transform) */
+.awwwards-cursor-dot-wrap,
+.awwwards-cursor-ring-wrap {
   position: fixed;
   top: 0;
   left: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* 1. Dot Core */
+.awwwards-cursor-dot-core {
   width: 8px;
   height: 8px;
-  margin-top: -4px;
-  margin-left: -4px;
+  border-radius: 50%;
   background-color: #86efac;
+  box-shadow: 0 0 10px #86efac, 0 0 20px rgba(134, 239, 172, 0.4);
+  transform: translate(-50%, -50%) scale(1);
+  transition: 
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.25s ease,
+    box-shadow 0.25s ease,
+    width 0.2s ease,
+    height 0.2s ease,
+    border-radius 0.2s ease;
+}
+
+/* 2. Ring Core */
+.awwwards-cursor-ring-core {
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  pointer-events: none;
-  z-index: 9999;
-  box-shadow: 0 0 10px #86efac;
-  transition: transform 0.1s ease, width 0.2s ease, height 0.2s ease, background-color 0.25s ease, box-shadow 0.25s ease;
+  border: 1.5px solid rgba(134, 239, 172, 0.65);
+  background-color: transparent;
+  transform: translate(-50%, -50%) scale(1);
+  transition: 
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
-.awwwards-cursor-ring {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 38px;
-  height: 38px;
-  margin-top: -19px;
-  margin-left: -19px;
-  border: 1.5px solid rgba(134, 239, 172, 0.6);
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 9998;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), width 0.25s ease, height 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
+/* Clicked States */
+.awwwards-cursor-dot-core.clicked {
+  transform: translate(-50%, -50%) scale(0.65);
 }
 
-/* Custom Cursor Hover and Click States */
-.awwwards-cursor-dot.clicked {
-  transform: scale(1.6) !important;
-}
-
-.awwwards-cursor-ring.clicked {
-  transform: scale(0.7) !important;
-  border-width: 2.5px;
-}
-
-/* 1. Journey / Primary Button Cursor: Vibrant Lime */
-.awwwards-cursor-dot.cursor-journey {
-  background-color: #4ade80;
-  box-shadow: 0 0 14px #4ade80, 0 0 25px rgba(74, 222, 128, 0.8);
-  transform: scale(1.4);
-}
-.awwwards-cursor-ring.cursor-journey {
-  border-color: #86efac;
-  background-color: rgba(134, 239, 172, 0.15);
-  transform: scale(1.35);
-  box-shadow: 0 0 20px rgba(134, 239, 172, 0.4);
-}
-
-/* 2. Watch Story / Video Cursor: Golden Starlight */
-.awwwards-cursor-dot.cursor-watch {
-  background-color: #fde047;
-  box-shadow: 0 0 14px #fde047, 0 0 25px rgba(253, 224, 71, 0.8);
-  transform: scale(1.3);
-}
-.awwwards-cursor-ring.cursor-watch {
+.awwwards-cursor-ring-core.clicked {
+  transform: translate(-50%, -50%) scale(1.45);
   border-color: #fde047;
-  background-color: rgba(253, 224, 71, 0.14);
-  transform: scale(1.3);
-  box-shadow: 0 0 20px rgba(253, 224, 71, 0.4);
+  border-width: 2px;
+  background-color: rgba(253, 224, 71, 0.15);
 }
 
-/* 3. Needs Help / Shield Cursor: Amber & Emergency Flame */
-.awwwards-cursor-dot.cursor-help {
+/* 1. Journey Cursor: Vibrant Lime Energy */
+.awwwards-cursor-dot-core.cursor-journey {
+  background-color: #4ade80;
+  box-shadow: 0 0 14px #4ade80, 0 0 26px rgba(74, 222, 128, 0.85);
+  transform: translate(-50%, -50%) scale(1.4);
+}
+.awwwards-cursor-ring-core.cursor-journey {
+  border-color: #86efac;
+  background-color: rgba(134, 239, 172, 0.16);
+  box-shadow: 0 0 20px rgba(134, 239, 172, 0.45);
+  transform: translate(-50%, -50%) scale(1.35);
+}
+
+/* 2. Watch Story Cursor: Golden Starlight */
+.awwwards-cursor-dot-core.cursor-watch {
+  background-color: #fde047;
+  box-shadow: 0 0 14px #fde047, 0 0 26px rgba(253, 224, 71, 0.85);
+  transform: translate(-50%, -50%) scale(1.3);
+}
+.awwwards-cursor-ring-core.cursor-watch {
+  border-color: #fde047;
+  background-color: rgba(253, 224, 71, 0.15);
+  box-shadow: 0 0 20px rgba(253, 224, 71, 0.45);
+  transform: translate(-50%, -50%) scale(1.3);
+}
+
+/* 3. Needs Help / Emergency Cursor: Amber Beacon Pulse */
+.awwwards-cursor-dot-core.cursor-help {
   background-color: #f59e0b;
   box-shadow: 0 0 16px #f59e0b, 0 0 28px rgba(245, 158, 11, 0.9);
-  transform: scale(1.4);
+  transform: translate(-50%, -50%) scale(1.35);
 }
-.awwwards-cursor-ring.cursor-help {
+.awwwards-cursor-ring-core.cursor-help {
   border-color: #fbbf24;
-  background-color: rgba(245, 158, 11, 0.16);
-  transform: scale(1.35);
-  animation: cursorHelpPulse 1.2s infinite alternate;
+  background-color: rgba(245, 158, 11, 0.18);
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+  transform: translate(-50%, -50%) scale(1.35);
+  animation: cursorBeaconPulse 1.2s infinite alternate;
 }
-@keyframes cursorHelpPulse {
-  0% { transform: scale(1.2); border-color: #f59e0b; }
-  100% { transform: scale(1.45); border-color: #ef4444; }
+@keyframes cursorBeaconPulse {
+  0% { transform: translate(-50%, -50%) scale(1.25); border-color: #f59e0b; }
+  100% { transform: translate(-50%, -50%) scale(1.5); border-color: #ef4444; }
 }
 
 /* 4. Casual Talk Cursor: Lush Jade */
-.awwwards-cursor-dot.cursor-casual {
+.awwwards-cursor-dot-core.cursor-casual {
   background-color: #10b981;
-  box-shadow: 0 0 14px #10b981, 0 0 22px rgba(16, 185, 129, 0.7);
-  transform: scale(1.3);
+  box-shadow: 0 0 14px #10b981, 0 0 24px rgba(16, 185, 129, 0.7);
+  transform: translate(-50%, -50%) scale(1.3);
 }
-.awwwards-cursor-ring.cursor-casual {
+.awwwards-cursor-ring-core.cursor-casual {
   border-color: #34d399;
-  background-color: rgba(16, 185, 129, 0.12);
-  transform: scale(1.25);
+  background-color: rgba(16, 185, 129, 0.14);
+  transform: translate(-50%, -50%) scale(1.25);
 }
 
 /* 5. Prompt Chip Cursor: Cyan Glow */
-.awwwards-cursor-dot.cursor-chip {
+.awwwards-cursor-dot-core.cursor-chip {
   background-color: #38bdf8;
-  box-shadow: 0 0 12px #38bdf8;
-  transform: scale(1.25);
+  box-shadow: 0 0 14px #38bdf8;
+  transform: translate(-50%, -50%) scale(1.25);
 }
-.awwwards-cursor-ring.cursor-chip {
+.awwwards-cursor-ring-core.cursor-chip {
   border-color: #38bdf8;
-  background-color: rgba(56, 189, 248, 0.12);
-  transform: scale(1.2);
+  background-color: rgba(56, 189, 248, 0.14);
+  transform: translate(-50%, -50%) scale(1.2);
 }
 
-/* 6. Input Field Cursor: Warm Parchment */
-.awwwards-cursor-dot.cursor-input {
-  background-color: #fef3c7;
-  box-shadow: 0 0 10px #fef3c7;
-  width: 4px;
-  height: 14px;
+/* 6. Input Field Cursor: Text Beam */
+.awwwards-cursor-dot-core.cursor-input {
+  background-color: #86efac;
+  box-shadow: 0 0 10px #86efac;
+  width: 3px;
+  height: 18px;
   border-radius: 2px;
+  transform: translate(-50%, -50%) scale(1);
 }
-.awwwards-cursor-ring.cursor-input {
-  border-color: rgba(254, 243, 199, 0.5);
-  transform: scale(0.9);
+.awwwards-cursor-ring-core.cursor-input {
+  border-color: rgba(134, 239, 172, 0.35);
+  transform: translate(-50%, -50%) scale(0.7);
+  opacity: 0.5;
 }
 
-/* 7. Sprout Avatar / Brand Logo Cursor: Heartlight Golden Pulse */
-.awwwards-cursor-dot.cursor-avatar {
+/* 7. Avatar Cursor: Golden Halo Pulse */
+.awwwards-cursor-dot-core.cursor-avatar {
   background-color: #fbbf24;
-  box-shadow: 0 0 15px #fbbf24;
-  transform: scale(1.5);
+  box-shadow: 0 0 16px #fbbf24;
+  transform: translate(-50%, -50%) scale(1.45);
 }
-.awwwards-cursor-ring.cursor-avatar {
+.awwwards-cursor-ring-core.cursor-avatar {
   border-color: #fbbf24;
   background-color: rgba(251, 191, 36, 0.2);
-  transform: scale(1.4);
+  transform: translate(-50%, -50%) scale(1.4);
 }
 
-/* 8. Default Interactive Hover */
-.awwwards-cursor-dot.cursor-default-hover {
+/* 8. Default Interactive Hover (Buttons, Links, Cards) */
+.awwwards-cursor-dot-core.cursor-default-hover {
   background-color: #86efac;
-  box-shadow: 0 0 12px #86efac;
-  transform: scale(1.25);
+  box-shadow: 0 0 14px #86efac;
+  transform: translate(-50%, -50%) scale(1.3);
 }
-.awwwards-cursor-ring.cursor-default-hover {
+.awwwards-cursor-ring-core.cursor-default-hover {
   border-color: #86efac;
-  background-color: rgba(134, 239, 172, 0.1);
-  transform: scale(1.2);
+  background-color: rgba(134, 239, 172, 0.15);
+  box-shadow: 0 0 15px rgba(134, 239, 172, 0.3);
+  transform: translate(-50%, -50%) scale(1.28);
 }
 
 /* ==========================================================================
@@ -3254,6 +3295,272 @@ input.has-error {
 @keyframes fadeInApp {
   0% { opacity: 0; transform: scale(1.02); }
   100% { opacity: 1; transform: scale(1); }
+}
+
+/* ==========================================================================
+   SUPERHERO BEACON DISPATCHING ANIMATION
+   ========================================================================== */
+.sprout-dispatching-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  background: rgba(8, 24, 16, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 16px;
+  border: 1.5px solid rgba(134, 239, 172, 0.45);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(74, 222, 128, 0.2);
+  min-height: 380px;
+  width: 100%;
+  animation: dispatchFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.story-dispatching-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+  background: rgba(4, 14, 9, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: dispatchFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes dispatchFadeIn {
+  0% { opacity: 0; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.dispatch-beacon-core {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.beacon-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid #86efac;
+  opacity: 0;
+  animation: beaconRingExpand 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.beacon-ring.ring-1 {
+  animation-delay: 0s;
+}
+
+.beacon-ring.ring-2 {
+  animation-delay: 0.7s;
+}
+
+.beacon-ring.ring-3 {
+  animation-delay: 1.4s;
+}
+
+@keyframes beaconRingExpand {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.95;
+    border-color: #86efac;
+  }
+  50% {
+    opacity: 0.55;
+    border-color: #fde047;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+    border-color: #4ade80;
+  }
+}
+
+.beacon-avatar-wrap {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  padding: 3px;
+  background: linear-gradient(135deg, #86efac, #fde047);
+  box-shadow: 0 0 25px rgba(134, 239, 172, 0.6), inset 0 0 10px rgba(0, 0, 0, 0.5);
+  animation: beaconAvatarPulse 1.8s ease-in-out infinite alternate;
+  z-index: 2;
+  overflow: hidden;
+}
+
+@keyframes beaconAvatarPulse {
+  0% {
+    box-shadow: 0 0 20px rgba(134, 239, 172, 0.5);
+    transform: scale(1);
+  }
+  100% {
+    box-shadow: 0 0 35px rgba(253, 224, 71, 0.85);
+    transform: scale(1.06);
+  }
+}
+
+.beacon-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.beacon-sweep-radar {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0deg, transparent 270deg, rgba(134, 239, 172, 0.55) 360deg);
+  animation: radarSweep 1.6s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes radarSweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dispatch-status-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  max-width: 440px;
+}
+
+.dispatch-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 9999px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  color: #fca5a5;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dispatch-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 10px #ef4444;
+  animation: liveDotPulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes liveDotPulse {
+  0% { opacity: 0.4; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1.3); }
+}
+
+.dispatch-title {
+  font-family: var(--font-serif);
+  font-size: 1.45rem;
+  color: #ffffff;
+  margin: 0;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.dispatch-desc {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.82);
+  margin: 0;
+}
+
+.dispatch-meter-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 0.4rem;
+  position: relative;
+}
+
+.dispatch-meter-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(90deg, #4ade80, #fde047);
+  box-shadow: 0 0 12px #86efac;
+  border-radius: 9999px;
+  animation: meterFill 1.8s ease-in-out infinite;
+}
+
+@keyframes meterFill {
+  0% {
+    left: -35%;
+    width: 35%;
+  }
+  50% {
+    left: 20%;
+    width: 60%;
+  }
+  100% {
+    left: 100%;
+    width: 35%;
+  }
+}
+
+.dispatch-coordinates-text {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: rgba(134, 239, 172, 0.75);
+  font-family: monospace;
+  margin-top: 0.2rem;
+}
+
+.signal-success-icon-wrap {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 0.8rem;
+}
+
+.signal-burst-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid #22c55e;
+  animation: burstExpand 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.signal-burst-ring.ring-burst-2 {
+  animation-delay: 0.6s;
+}
+
+@keyframes burstExpand {
+  0% { transform: scale(0.7); opacity: 0.9; }
+  100% { transform: scale(1.8); opacity: 0; }
 }
 
 
